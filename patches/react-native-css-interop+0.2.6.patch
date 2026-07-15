@@ -1,0 +1,40 @@
+diff --git a/node_modules/react-native-css-interop/.cache/android.js b/node_modules/react-native-css-interop/.cache/android.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/ios.js b/node_modules/react-native-css-interop/.cache/ios.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/macos.js b/node_modules/react-native-css-interop/.cache/macos.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/native.js b/node_modules/react-native-css-interop/.cache/native.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/.cache/windows.js b/node_modules/react-native-css-interop/.cache/windows.js
+new file mode 100644
+index 0000000..e69de29
+diff --git a/node_modules/react-native-css-interop/dist/runtime/web/color-scheme.js b/node_modules/react-native-css-interop/dist/runtime/web/color-scheme.js
+index c8fb1d2..6f84940 100644
+--- a/node_modules/react-native-css-interop/dist/runtime/web/color-scheme.js
++++ b/node_modules/react-native-css-interop/dist/runtime/web/color-scheme.js
+@@ -33,6 +33,8 @@ else if ("window" in globalThis) {
+         const flags = darkModeFlag.split(" ");
+         darkMode = flags[0];
+         darkModeValue = flags[1];
++        if (darkMode === "media")
++            return;
+         exports.colorScheme.set(globalThis.window.document.documentElement.classList.contains(darkModeValue)
+             ? "dark"
+             : "system");
+diff --git a/node_modules/react-native-css-interop/src/runtime/web/color-scheme.ts b/node_modules/react-native-css-interop/src/runtime/web/color-scheme.ts
+index 3e64d9f..4a60864 100644
+--- a/node_modules/react-native-css-interop/src/runtime/web/color-scheme.ts
++++ b/node_modules/react-native-css-interop/src/runtime/web/color-scheme.ts
+@@ -41,6 +41,7 @@ if (darkModeFlag) {
+     const flags = darkModeFlag.split(" ");
+     darkMode = flags[0];
+     darkModeValue = flags[1];
++    if (darkMode === "media") return;
+     colorScheme.set(
+       globalThis.window.document.documentElement.classList.contains(
+         darkModeValue,
