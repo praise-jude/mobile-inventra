@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { signIn } from '@/lib/actions/auth';
+import { haptics } from '@/lib/haptics';
 import { type LoginInput, loginSchema } from '@/lib/validation/auth';
 
 export default function LoginScreen() {
@@ -26,9 +27,11 @@ export default function LoginScreen() {
     setFormError(null);
     try {
       await signIn(values.email, values.password);
+      haptics.success();
       // Session change flows through AuthProvider's onAuthStateChange
       // listener, which drives the root Stack.Protected redirect.
     } catch (err) {
+      haptics.warning();
       setFormError(err instanceof Error ? err.message : 'Something went wrong.');
     }
   }

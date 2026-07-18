@@ -7,20 +7,24 @@ import '@/global.css';
 
 import { Platform } from 'react-native';
 
+// Mirrors tailwind.config.js's brand tokens (bg/surface/text/text-2/accent-
+// weak pairs) so native-chrome surfaces that can't use NativeWind classes
+// directly — the splash overlay, NativeTabs' bar/indicator colors — still
+// match the rest of the app instead of Expo's default black-and-white.
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#111827',
+    background: '#f8fafc',
+    backgroundElement: '#ffffff',
+    backgroundSelected: '#eff6ff',
+    textSecondary: '#55607a',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#eef1f7',
+    background: '#0b0d12',
+    backgroundElement: '#14171f',
+    backgroundSelected: '#17233f',
+    textSecondary: '#b3bacb',
   },
 } as const;
 

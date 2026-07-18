@@ -3,6 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import Animated, { Keyframe, Easing } from 'react-native-reanimated';
 
 import classes from './animated-icon.module.css';
+
+// Same brand mark as the native splash (animated-icon.tsx) — see that file's
+// comment for provenance.
+const LOGO = require('@/assets/images/brand-logo.png');
 const DURATION = 300;
 
 export function AnimatedSplashOverlay() {
@@ -39,34 +43,15 @@ const logoKeyframe = new Keyframe({
   },
 });
 
-const glowKeyframe = new Keyframe({
-  0: {
-    transform: [{ rotateZ: '-180deg' }, { scale: 0.8 }],
-    opacity: 0,
-  },
-  [DURATION / 1000]: {
-    transform: [{ rotateZ: '0deg' }, { scale: 1 }],
-    opacity: 1,
-    easing: Easing.elastic(0.7),
-  },
-  100: {
-    transform: [{ rotateZ: '7200deg' }],
-  },
-});
-
 export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
-      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
-        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
-      </Animated.View>
-
       <Animated.View style={styles.background} entering={keyframe.duration(DURATION)}>
         <div className={classes.expoLogoBackground} />
       </Animated.View>
 
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image style={styles.image} source={LOGO} contentFit="contain" />
       </Animated.View>
     </View>
   );
@@ -84,25 +69,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  glow: {
-    width: 201,
-    height: 201,
-    position: 'absolute',
-  },
   iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 128,
-    height: 128,
+    width: 168,
+    height: 168,
   },
   image: {
     position: 'absolute',
-    width: 76,
-    height: 71,
+    width: 148,
+    height: 146,
   },
   background: {
-    width: 128,
-    height: 128,
+    width: 220,
+    height: 220,
     position: 'absolute',
   },
 });

@@ -1,9 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
+import { PaystackCheckoutModal, type PaystackMessage } from '@/components/paystack-checkout';
 import { Button } from '@/components/ui/button';
 import { initiateAddCard } from '@/lib/actions/billing';
 import { useAuth } from '@/lib/auth-context';
@@ -11,45 +11,6 @@ import { PLANS, planByKey } from '@/lib/billing-plans';
 
 function naira(n: number): string {
   return `₦${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-// Paystack Inline v2, run inside a WebView and driven via resumeTransaction
-// so checkout completes through in-page onSuccess/onCancel callbacks —
-// no external browser redirect or deep link needed for the common case.
-// callback_url (still set server-side, see Inventra's initiateAddCardForContext)
-// only matters as a fallback for issuers that force a full-page 3D Secure
-// redirect away from the popup; onNavigationStateChange below catches that.
-function checkoutHtml(accessCode: string): string {
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<script src="https://js.paystack.co/v2/inline.js"></script>
-</head>
-<body style="margin:0;background:#f8fafc;">
-<script>
-  function postToRN(payload) {
-    window.ReactNativeWebView.postMessage(JSON.stringify(payload));
-  }
-  try {
-    var popup = new PaystackPop();
-    popup.resumeTransaction(${JSON.stringify(accessCode)}, {
-      onSuccess: function (transaction) {
-        postToRN({ type: 'success', reference: transaction && transaction.reference });
-      },
-      onCancel: function () {
-        postToRN({ type: 'cancel' });
-      },
-      onError: function (error) {
-        postToRN({ type: 'error', message: error && error.message });
-      }
-    });
-  } catch (e) {
-    postToRN({ type: 'error', message: String(e) });
-  }
-</script>
-</body>
-</html>`;
 }
 
 export default function OnboardingPlanScreen() {
@@ -145,25 +106,22 @@ function AddCardStep({ planKey, onBack }: { planKey: 'monthly' | 'yearly'; onBac
     }
   }
 
-  function handleWebViewMessage(event: WebViewMessageEvent) {
-    let payload: { type: 'success' | 'cancel' | 'error'; reference?: string; message?: string };
-    try {
-      payload = JSON.parse(event.nativeEvent.data);
-    } catch {
-      return;
-    }
+  // The webhook (Paystack's real source of truth for subscription state)
+  // lands asynchronously — give it a moment before re-checking the gate,
+  // mirroring Inventra's web CallbackRedirect.
+  function verifyAndClose() {
+    setAccessCode(null);
+    setVerifying(true);
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['access-gate'] });
+      refetchGate();
+      setVerifying(false);
+    }, 2500);
+  }
 
+  function handleWebViewMessage(payload: PaystackMessage) {
     if (payload.type === 'success') {
-      setAccessCode(null);
-      // The webhook (Paystack's real source of truth for subscription
-      // state) lands asynchronously — give it a moment before re-checking
-      // the gate, mirroring Inventra's web CallbackRedirect.
-      setVerifying(true);
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['access-gate'] });
-        refetchGate();
-        setVerifying(false);
-      }, 2500);
+      verifyAndClose();
     } else if (payload.type === 'cancel') {
       setAccessCode(null);
     } else {
@@ -212,42 +170,12 @@ function AddCardStep({ planKey, onBack }: { planKey: 'monthly' | 'yearly'; onBac
         </View>
       </View>
 
-      <Modal visible={!!accessCode} animationType="slide" onRequestClose={() => setAccessCode(null)}>
-        <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
-          <View className="flex-row items-center justify-between border-b border-border px-4 py-3 dark:border-border-dark">
-            <Text className="text-[16px] font-bold text-text dark:text-text-dark">Secure checkout</Text>
-            <Pressable onPress={() => setAccessCode(null)}>
-              <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Cancel</Text>
-            </Pressable>
-          </View>
-          {accessCode && (
-            <WebView
-              source={{ html: checkoutHtml(accessCode) }}
-              onMessage={handleWebViewMessage}
-              onNavigationStateChange={(navState) => {
-                // Fallback for card issuers whose 3D Secure flow forces a
-                // full-page redirect out of the popup — Paystack lands here
-                // afterward with ?reference=... on success.
-                if (navState.url.includes('/onboarding/plan/callback')) {
-                  setAccessCode(null);
-                  setVerifying(true);
-                  setTimeout(() => {
-                    queryClient.invalidateQueries({ queryKey: ['access-gate'] });
-                    refetchGate();
-                    setVerifying(false);
-                  }, 2500);
-                }
-              }}
-              startInLoadingState
-              renderLoading={() => (
-                <View className="flex-1 items-center justify-center">
-                  <ActivityIndicator size="large" />
-                </View>
-              )}
-            />
-          )}
-        </SafeAreaView>
-      </Modal>
+      <PaystackCheckoutModal
+        accessCode={accessCode}
+        onClose={() => setAccessCode(null)}
+        onMessage={handleWebViewMessage}
+        onCallbackUrlHit={verifyAndClose}
+      />
     </SafeAreaView>
   );
 }

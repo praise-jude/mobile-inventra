@@ -10,6 +10,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { registerAccount } from '@/lib/actions/auth';
 import { COUNTRIES, statesForCountry } from '@/lib/geo/countries';
+import { haptics } from '@/lib/haptics';
 import { PASSWORD_RULES, passwordStrength, type SignupInput, signupSchema } from '@/lib/validation/auth';
 
 const ROLE_OPTIONS = [
@@ -57,9 +58,11 @@ export default function SignupScreen() {
     setFormError(null);
     const result = await registerAccount(values);
     if (!result.ok) {
+      haptics.warning();
       setFormError(result.error);
       return;
     }
+    haptics.success();
     if (result.hasSession) return; // root gate takes over
     setAwaitingConfirmation(values.email);
   }

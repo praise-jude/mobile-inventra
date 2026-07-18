@@ -1,16 +1,24 @@
 import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { StyleSheet, useColorScheme, View } from 'react-native';
 import Animated, { Easing, Keyframe } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
+import { Colors } from '@/constants/theme';
+
 const DURATION = 600;
+
+// Same brand mark used for the app icon (assets/images/icon.png) and Android
+// adaptive-icon foreground — extracted from Inventra/public/inventra-logo.svg
+// so the splash reads as the same product as the web app, not Expo's default.
+const LOGO = require('@/assets/images/brand-logo.png');
 
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
+  const scheme = useColorScheme();
+  const bg = Colors[scheme === 'dark' ? 'dark' : 'light'].background;
 
   if (!visible) return null;
 
@@ -33,7 +41,7 @@ export function AnimatedSplashOverlay() {
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const image = <Image style={styles.image} source={LOGO} contentFit="contain" />;
 
   return animate ? (
     <Animated.View
@@ -43,7 +51,7 @@ export function AnimatedSplashOverlay() {
           scheduleOnRN(setVisible, false);
         }
       })}
-      style={styles.splashOverlay}>
+      style={[styles.splashOverlay, { backgroundColor: bg }]}>
       {image}
     </Animated.View>
   ) : (
@@ -53,21 +61,11 @@ export function AnimatedSplashOverlay() {
           setAnimate(true);
         });
       }}
-      style={styles.splashOverlay}>
+      style={[styles.splashOverlay, { backgroundColor: bg }]}>
       {image}
     </View>
   );
 }
-
-const keyframe = new Keyframe({
-  0: {
-    transform: [{ scale: INITIAL_SCALE_FACTOR }],
-  },
-  100: {
-    transform: [{ scale: 1 }],
-    easing: Easing.elastic(0.7),
-  },
-});
 
 const logoKeyframe = new Keyframe({
   0: {
@@ -95,16 +93,15 @@ const glowKeyframe = new Keyframe({
   },
 });
 
+// A larger, standalone version of the brand mark with the same
+// glow/entrance choreography as the splash — reused as the hero moment on
+// the onboarding carousel's final "Get Started" page.
 export function AnimatedIcon() {
   return (
     <View style={styles.iconContainer}>
-      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow}>
-        <Image style={styles.glow} source={require('@/assets/images/logo-glow.png')} />
-      </Animated.View>
-
-      <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
+      <Animated.View entering={glowKeyframe.duration(60 * 1000 * 4)} style={styles.glow} />
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image style={styles.image} source={LOGO} contentFit="contain" />
       </Animated.View>
     </View>
   );
@@ -116,31 +113,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   glow: {
-    width: 201,
-    height: 201,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     position: 'absolute',
+    // Flat translucent circle rather than a radial-gradient falloff — RN's
+    // `experimental_backgroundImage` (which supports radial-gradient()) is
+    // native-only and doesn't render on web; a solid low-opacity fill reads
+    // as a soft glow on every platform without extra assets or libraries.
+    backgroundColor: 'rgba(37,99,235,0.18)',
   },
   iconContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 128,
-    height: 128,
+    width: 168,
+    height: 168,
     zIndex: 100,
   },
   image: {
-    width: 76,
-    height: 71,
-  },
-  background: {
-    borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
-    width: 128,
-    height: 128,
-    position: 'absolute',
+    width: 148,
+    height: 146,
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,

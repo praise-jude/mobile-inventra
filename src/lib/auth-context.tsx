@@ -18,12 +18,17 @@ interface AuthContextValue {
   // yet (trial_ends_at is only set once the Paystack webhook confirms
   // tokenization). Only meaningful once needsOnboarding is false — the
   // subscription/billing gate is a separate, later tier from profile
-  // onboarding. Web's further "blocked" tier (expired/past_due/etc. for
-  // *returning* users) isn't wired into mobile routing yet — that's a
-  // separate follow-up, not needed to unblock first-time onboarding.
+  // onboarding.
   awaitingCard: boolean;
+  // Mirrors middleware's BLOCKED_STATUSES + trialExpired check: a returning
+  // user whose trial ran out or whose subscription lapsed (past_due,
+  // payment_failed, cancelled, expired, suspended). Only meaningful once
+  // needsOnboarding and awaitingCard are both false.
+  blocked: boolean;
   refetchGate: () => void;
 }
+
+const BLOCKED_STATUSES = ['past_due', 'payment_failed', 'cancelled', 'expired', 'suspended'];
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -68,6 +73,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
   const awaitingCard = gate?.subscription_status === 'trialing' && !gate.trial_ends_at;
 
+  let blocked = false;
+  if (session && !needsOnboarding && !awaitingCard) {
+    const trialExpired =
+      gate?.subscription_status === 'trialing' && !!gate.trial_ends_at && new Date(gate.trial_ends_at) < new Date();
+    blocked = trialExpired || (!!gate?.subscription_status && BLOCKED_STATUSES.includes(gate.subscription_status));
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -77,6 +89,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         gateLoading: gateQuery.isLoading,
         needsOnboarding,
         awaitingCard,
+        blocked,
         refetchGate: () => void gateQuery.refetch(),
       }}
     >
