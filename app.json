@@ -41,7 +41,21 @@
       "expo-image",
       "expo-secure-store",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Royal Inventra uses your camera to scan product barcodes during checkout and stock entry."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Royal Inventra uses your photo library to add product photos.",
+          "cameraPermission": "Royal Inventra uses your camera to take product photos."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

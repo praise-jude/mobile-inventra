@@ -61,6 +61,96 @@ export type Profile = {
 
 export type InvoiceStatus = 'paid' | 'pending' | 'failed';
 
+export type ProductStatus = 'in_stock' | 'low_stock' | 'out_of_stock';
+export type MovementType = 'received' | 'sale' | 'adjustment' | 'transfer' | 'return' | 'expired';
+export type AdjustmentType = 'increase' | 'decrease' | 'damaged' | 'expired' | 'count_correction' | 'loss' | 'other';
+export type PaymentMethod = 'cash' | 'card' | 'bank_transfer' | 'mobile_money';
+
+// Mirrors Inventra/supabase/migrations/20260708120000_init.sql +
+// 20260709121240_audit_log_and_product_status.sql (is_active).
+export type Product = {
+  id: string;
+  org_id: string;
+  category_id: string | null;
+  warehouse_id: string | null;
+  supplier_id: string | null;
+  name: string;
+  description: string | null;
+  emoji: string | null;
+  brand: string | null;
+  sku: string;
+  unit: string;
+  cost_price: number;
+  sell_price: number;
+  reorder_level: number;
+  qty_on_hand: number;
+  qty_reserved: number;
+  qty_damaged: number;
+  qty_returned: number;
+  expiry_date: string | null;
+  batch_number: string | null;
+  status: ProductStatus;
+  is_active: boolean;
+  image_url: string | null;
+  barcode: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Category = {
+  id: string;
+  org_id: string;
+  name: string;
+  emoji: string | null;
+};
+
+export type Supplier = {
+  id: string;
+  org_id: string;
+  name: string;
+  created_at: string;
+};
+
+export type Warehouse = {
+  id: string;
+  org_id: string;
+  name: string;
+  address: string | null;
+};
+
+export type Customer = {
+  id: string;
+  org_id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  created_at: string;
+};
+
+export type Sale = {
+  id: string;
+  org_id: string;
+  customer_id: string | null;
+  walk_in_name: string | null;
+  warehouse_id: string | null;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type SalePayment = {
+  id: string;
+  org_id: string;
+  sale_id: string;
+  method: PaymentMethod;
+  amount: number;
+};
+
 // Narrowed to the fields the (billing) subscription-required screen
 // actually displays — mirrors Inventra/lib/supabase/database.types.ts's
 // Subscription/Invoice interfaces (same "hand-maintained slice" convention
@@ -140,25 +230,56 @@ export type StockHealthRow = {
   count: number;
 };
 
+// Mirrors the stock_movements table exactly (init.sql + the sale_id/
+// adjustment_type/notes columns added later) — previously had a wrong
+// `actor_id` field name (the real column is `created_by`) that happened to
+// be harmless because nothing selected it by name yet; fixed now that the
+// movements/adjustments screens actually need it.
 export type StockMovement = {
   id: string;
-  type: string;
-  qty_delta: number;
-  reason: string | null;
-  created_at: string;
+  org_id: string;
   product_id: string;
-  actor_id: string | null;
+  warehouse_id: string | null;
+  type: MovementType;
+  qty_delta: number;
+  unit_price: number | null;
+  reason: string | null;
+  adjustment_type: AdjustmentType | null;
+  notes: string | null;
+  sale_id: string | null;
+  created_by: string | null;
+  created_at: string;
 };
 
-type TableDef<Row, Update> = {
+// Mirrors Inventra/lib/actions/audit.ts's logAudit — writing directly from
+// mobile (insert-only RLS, scoped to the caller's own org/identity, per
+// 20260709121240_audit_log_and_product_status.sql) rather than through a
+// server helper, since there's no secret-key dependency here the way
+// billing's Paystack calls had one.
+export type AuditLog = {
+  id: string;
+  org_id: string;
+  actor_id: string;
+  actor_name: string;
+  actor_role: UserRole;
+  action: string;
+  module: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  entity_label: string | null;
+  new_value: Record<string, unknown> | null;
+  created_at: string;
+};
+
+type TableDef<Row, Insert, Update> = {
   Row: Row;
-  Insert: never;
+  Insert: Insert;
   Update: Update;
-  // Required by supabase-js's GenericTable constraint. The one embedded-
-  // resource select this app does (stock_movements -> products/profiles on
-  // the dashboard's recent-activity feed) is cast to a local row type by
-  // hand at the call site instead of being modeled here — same "cast an
-  // ad-hoc join shape" precedent as Inventra/lib/queries/dashboard.ts's
+  // Required by supabase-js's GenericTable constraint. Embedded-resource
+  // selects this app does (e.g. stock_movements -> products/profiles on the
+  // dashboard's recent-activity feed) are cast to a local row type by hand
+  // at the call site instead of being modeled here — same "cast an ad-hoc
+  // join shape" precedent as Inventra/lib/queries/dashboard.ts's
   // getRecentActivity.
   Relationships: [];
 };
@@ -168,18 +289,36 @@ export type Database = {
     Tables: {
       organizations: TableDef<
         Organization,
+        never,
         Partial<Pick<Organization, 'name' | 'business_email' | 'country' | 'state' | 'currency' | 'timezone'>>
       >;
       profiles: TableDef<
         Profile,
+        never,
         Partial<Pick<Profile, 'terms_accepted' | 'terms_version' | 'terms_accepted_at' | 'terms_accepted_ip'>>
       >;
       // Read-only from the mobile client — every write goes through the
       // bearer-token routes under Inventra's app/api/mobile/billing/, never
       // a direct table update, so `Update` is `never` here.
-      subscriptions: TableDef<Subscription, never>;
-      invoices: TableDef<Invoice, never>;
-      stock_movements: TableDef<StockMovement, never>;
+      subscriptions: TableDef<Subscription, never, never>;
+      invoices: TableDef<Invoice, never, never>;
+
+      products: TableDef<
+        Product,
+        Omit<Product, 'id' | 'status' | 'created_at' | 'updated_at'> & { id?: string },
+        Partial<Omit<Product, 'id' | 'org_id' | 'status' | 'created_at' | 'updated_at'>>
+      >;
+      categories: TableDef<Category, Omit<Category, 'id'> & { id?: string }, never>;
+      suppliers: TableDef<Supplier, Omit<Supplier, 'id' | 'created_at'> & { id?: string }, never>;
+      warehouses: TableDef<Warehouse, never, never>;
+      customers: TableDef<Customer, Omit<Customer, 'id' | 'created_at'> & { id?: string }, never>;
+      stock_movements: TableDef<StockMovement, Omit<StockMovement, 'id' | 'created_at'> & { id?: string }, never>;
+      sales: TableDef<Sale, Omit<Sale, 'id' | 'created_at'> & { id?: string }, Partial<Pick<Sale, 'notes'>>>;
+      sale_payments: TableDef<SalePayment, Omit<SalePayment, 'id'> & { id?: string }, Partial<Pick<SalePayment, 'method'>>>;
+      // actor_id has no DB default (unlike created_by-style columns
+      // elsewhere with a trigger) — the RLS insert policy requires it to be
+      // explicitly set to auth.uid(), so it must stay in the Insert shape.
+      audit_logs: TableDef<AuditLog, Omit<AuditLog, 'id' | 'created_at'> & { id?: string }, never>;
     };
     Views: Record<string, never>;
     Functions: {
