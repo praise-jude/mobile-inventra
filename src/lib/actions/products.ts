@@ -264,6 +264,16 @@ export async function deleteProduct(id: string): Promise<void> {
 // name and path convention (`${orgId}/${uniqueName}.${ext}`) match exactly
 // so both apps' uploads land in the same Supabase Storage bucket.
 export async function uploadProductImage(localUri: string, orgId: string): Promise<string> {
+  // Shared by both the Add and Edit product forms, so either permission
+  // suffices.
+  const [{ data: canCreate }, { data: canEdit }] = await Promise.all([
+    supabase.rpc('has_permission', { p_module: 'inventory', p_action: 'create' }),
+    supabase.rpc('has_permission', { p_module: 'inventory', p_action: 'edit' }),
+  ]);
+  if (!canCreate && !canEdit) {
+    throw new Error("You don't have permission to do that.");
+  }
+
   const ext = localUri.split('.').pop()?.toLowerCase() || 'jpg';
   const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const path = `${orgId}/${uniqueName}.${ext}`;
