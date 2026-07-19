@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState } from '@/components/error-state';
+import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { PRESET_LABELS, rangeForPreset, type DateRangePreset } from '@/lib/date-range';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -21,7 +22,8 @@ export default function SalesReportScreen() {
   const query = useSalesReport({ from: range.from, to: range.to }, range.granularity === 'month' ? 'month' : 'day');
 
   return (
-    <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
+    <ReportsAccessGate>
+      <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
       <View className="flex-row items-center justify-between border-b border-border px-4 py-3 dark:border-border-dark">
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Back</Text>
@@ -123,7 +125,8 @@ export default function SalesReportScreen() {
           </Pressable>
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </ReportsAccessGate>
   );
 }
 

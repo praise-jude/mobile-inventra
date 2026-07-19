@@ -11,7 +11,9 @@ import { REJECT_REASONS, approveMember, reactivateMember, rejectMember, removeMe
 import { useAuth } from '@/lib/auth-context';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { haptics } from '@/lib/haptics';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useTeamMembers, type TeamMemberRow } from '@/lib/hooks/use-team';
+import { isAdminRole } from '@/lib/roles';
 
 // Mirrors Inventra/components/team/TeamClient.tsx — a bottom-sheet Modal
 // stands in for the web dropdown menu, and Alert.alert stands in for
@@ -55,6 +57,8 @@ function displayStatus(m: TeamMemberRow): 'invited' | 'awaiting_approval' | 'act
 export default function TeamScreen() {
   const { session } = useAuth();
   const currentUserId = session?.user.id;
+  const profileQuery = useMyProfile();
+  const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
   const query = useTeamMembers();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
@@ -166,7 +170,10 @@ export default function TeamScreen() {
               const status = displayStatus(m);
               const isSelf = m.id === currentUserId;
               const isBusy = busyId === m.id;
-              const actionable = !isSelf && m.role !== 'owner';
+              // Managers can only ever open the sheet for a row they can
+              // act on (approve/reject) — same restriction enforced
+              // server-side by guard_profile_status_transitions().
+              const actionable = !isSelf && m.role !== 'owner' && (isAdmin || status === 'awaiting_approval');
               return (
                 <Pressable
                   onPress={() => actionable && setTarget(m)}
@@ -209,6 +216,7 @@ export default function TeamScreen() {
       {target && (
         <MemberActionsSheet
           member={target}
+          isAdmin={isAdmin}
           rejecting={rejecting}
           busy={busyId === target.id}
           onClose={() => {
@@ -235,6 +243,7 @@ export default function TeamScreen() {
 
 function MemberActionsSheet({
   member,
+  isAdmin,
   rejecting,
   busy,
   onClose,
@@ -248,6 +257,7 @@ function MemberActionsSheet({
   onRemove,
 }: {
   member: TeamMemberRow;
+  isAdmin: boolean;
   rejecting: boolean;
   busy: boolean;
   onClose: () => void;
@@ -287,7 +297,7 @@ function MemberActionsSheet({
           </View>
         ) : (
           <View className="gap-2.5">
-            {status === 'active' && (
+            {isAdmin && status === 'active' && (
               <SelectField
                 label="Role"
                 value={member.role}
@@ -295,7 +305,7 @@ function MemberActionsSheet({
                 onChange={onRoleChange}
               />
             )}
-            {status === 'invited' && (
+            {isAdmin && status === 'invited' && (
               <Button variant="secondary" loading={busy} onPress={onResendInvite}>
                 Resend invite
               </Button>
@@ -310,19 +320,21 @@ function MemberActionsSheet({
                 </Button>
               </>
             )}
-            {status === 'suspended' && (
+            {isAdmin && status === 'suspended' && (
               <Button variant="secondary" loading={busy} onPress={onReactivate}>
                 Reactivate
               </Button>
             )}
-            {status === 'active' && (
+            {isAdmin && status === 'active' && (
               <Button variant="secondary" loading={busy} onPress={onSuspend}>
                 Suspend
               </Button>
             )}
-            <Button variant="secondary" loading={busy} onPress={onRemove} className="border-red dark:border-red-dark">
-              <Text className="text-[14px] font-semibold text-red dark:text-red-dark">Remove</Text>
-            </Button>
+            {isAdmin && (
+              <Button variant="secondary" loading={busy} onPress={onRemove} className="border-red dark:border-red-dark">
+                <Text className="text-[14px] font-semibold text-red dark:text-red-dark">Remove</Text>
+              </Button>
+            )}
             <Button variant="ghost" onPress={onClose}>
               Cancel
             </Button>

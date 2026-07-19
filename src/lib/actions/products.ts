@@ -5,16 +5,9 @@
 // Paystack calls), so there's no need for a bearer-token API route the way
 // billing has one — RLS is the real enforcement boundary either way.
 import { logAudit } from '@/lib/actions/audit';
-import { isManagerRole } from '@/lib/roles';
+import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
-import type { Profile } from '@/types/database';
-
-function requireManagerRole(profile: Profile) {
-  if (!isManagerRole(profile.role)) {
-    throw new Error('Only an owner, admin, or manager can manage products.');
-  }
-}
 
 export interface CreateProductInput {
   name: string;
@@ -34,7 +27,7 @@ export interface CreateProductInput {
 
 export async function createProduct(input: CreateProductInput): Promise<string> {
   const profile = await requireProfile();
-  requireManagerRole(profile);
+  await requirePermission('inventory', 'create');
 
   const { data: product, error } = await supabase
     .from('products')
@@ -121,7 +114,7 @@ export interface UpdateProductInput {
 
 export async function updateProduct(id: string, input: UpdateProductInput): Promise<void> {
   const profile = await requireProfile();
-  requireManagerRole(profile);
+  await requirePermission('inventory', 'edit');
   const name = input.name.trim();
   const sku = input.sku.trim();
   if (!name) throw new Error('Product name is required.');
@@ -185,7 +178,7 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
 
 export async function setProductActive(id: string, isActive: boolean): Promise<void> {
   const profile = await requireProfile();
-  requireManagerRole(profile);
+  await requirePermission('inventory', 'edit');
   const { data: updated, error } = await supabase
     .from('products')
     .update({ is_active: isActive })
@@ -211,7 +204,7 @@ export async function setProductActive(id: string, isActive: boolean): Promise<v
 
 export async function archiveProduct(id: string): Promise<void> {
   const profile = await requireProfile();
-  requireManagerRole(profile);
+  await requirePermission('inventory', 'edit');
   const { data: archived, error } = await supabase
     .from('products')
     .update({ archived_at: new Date().toISOString() })
@@ -238,9 +231,7 @@ export async function archiveProduct(id: string): Promise<void> {
 // keeps that history intact instead, same rule as web.
 export async function deleteProduct(id: string): Promise<void> {
   const profile = await requireProfile();
-  if (!isManagerRole(profile.role)) {
-    throw new Error('Only an owner, admin, or manager can delete a product.');
-  }
+  await requirePermission('inventory', 'delete');
 
   const { count } = await supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('product_id', id);
   if ((count ?? 0) > 0) {

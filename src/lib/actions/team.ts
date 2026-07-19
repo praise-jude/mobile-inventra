@@ -7,7 +7,8 @@
 // dedicated app/api/mobile/team/* routes instead (same pattern as
 // actions/billing.ts's postToMobileBillingRoute).
 import { logAudit } from '@/lib/actions/audit';
-import { isAdminRole } from '@/lib/roles';
+import { createNotification } from '@/lib/actions/notifications';
+import { isAdminRole, isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types/database';
@@ -17,6 +18,17 @@ export const REJECT_REASONS = ['Wrong branch', 'Duplicate account', 'Invalid inv
 function requireAdminRole(profile: Profile) {
   if (!isAdminRole(profile.role)) {
     throw new Error('Only an owner or admin can manage team members.');
+  }
+}
+
+// Approve/reject also accept Manager-tier callers — mirrors
+// Inventra/lib/actions/team.ts's requireAdminOrManagerOrgId(). RLS
+// (guard_profile_status_transitions()) is the real enforcement boundary:
+// a Manager can only ever touch a row that's currently awaiting_approval,
+// regardless of what this check allows.
+function requireAdminOrManagerRole(profile: Profile) {
+  if (!isManagerRole(profile.role)) {
+    throw new Error('Only an owner, admin, or manager can manage team members.');
   }
 }
 
@@ -108,7 +120,7 @@ export async function reactivateMember(memberId: string): Promise<void> {
 
 export async function approveMember(memberId: string): Promise<void> {
   const profile = await requireProfile();
-  requireAdminRole(profile);
+  requireAdminOrManagerRole(profile);
 
   const { data: member } = await supabase
     .from('profiles')
@@ -126,6 +138,17 @@ export async function approveMember(memberId: string): Promise<void> {
     .eq('org_id', profile.org_id);
   if (error) throw new Error('Could not approve this member.');
 
+  const { data: org } = await supabase.from('organizations').select('name').eq('id', profile.org_id).single();
+  void createNotification({
+    orgId: profile.org_id,
+    userId: memberId,
+    type: 'member_approved',
+    title: 'Your account has been approved',
+    body: `You now have access to ${org?.name ?? 'your workspace'}.`,
+    entityType: 'profile',
+    entityId: memberId,
+  });
+
   void logAudit({
     orgId: profile.org_id,
     actorId: profile.id,
@@ -142,7 +165,7 @@ export async function approveMember(memberId: string): Promise<void> {
 
 export async function rejectMember(memberId: string, reason: (typeof REJECT_REASONS)[number], detail?: string): Promise<void> {
   const profile = await requireProfile();
-  requireAdminRole(profile);
+  requireAdminOrManagerRole(profile);
 
   const { data: member } = await supabase.from('profiles').select('org_id, first_name, last_name, status').eq('id', memberId).single();
   if (!member || member.org_id !== profile.org_id) throw new Error('Member not found.');
@@ -155,6 +178,16 @@ export async function rejectMember(memberId: string, reason: (typeof REJECT_REAS
     .eq('id', memberId)
     .eq('org_id', profile.org_id);
   if (error) throw new Error('Could not reject this member.');
+
+  void createNotification({
+    orgId: profile.org_id,
+    userId: memberId,
+    type: 'member_rejected',
+    title: 'Your account request was not approved',
+    body: fullReason,
+    entityType: 'profile',
+    entityId: memberId,
+  });
 
   void logAudit({
     orgId: profile.org_id,

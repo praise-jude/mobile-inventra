@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState } from '@/components/error-state';
+import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { PRESET_LABELS, rangeForPreset, type DateRangePreset } from '@/lib/date-range';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -18,6 +19,7 @@ export default function ProfitLossScreen() {
   const query = useProfitLoss({ from: range.from, to: range.to });
 
   return (
+    <ReportsAccessGate>
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
       <View className="flex-row items-center justify-between border-b border-border px-4 py-3 dark:border-border-dark">
         <Pressable onPress={() => router.back()} hitSlop={10}>
@@ -81,6 +83,7 @@ export default function ProfitLossScreen() {
         </ScrollView>
       )}
     </SafeAreaView>
+    </ReportsAccessGate>
   );
 }
 

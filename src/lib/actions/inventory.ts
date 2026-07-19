@@ -4,6 +4,7 @@
 // comment for why this doesn't need a bearer-token API route the way
 // billing does.
 import { logAudit } from '@/lib/actions/audit';
+import { requirePermission } from '@/lib/permissions';
 import { isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -96,6 +97,7 @@ export interface CreateAdjustmentInput {
 
 export async function createAdjustment(input: CreateAdjustmentInput): Promise<void> {
   const profile = await requireProfile();
+  await requirePermission('inventory', 'create_movement');
 
   if (!input.productId) throw new Error('Pick a product.');
   if (!Number.isInteger(input.qtyDelta) || input.qtyDelta === 0) {

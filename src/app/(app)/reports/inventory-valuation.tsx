@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
+import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { Skeleton } from '@/components/skeleton';
 import { formatMoney } from '@/lib/format';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
@@ -24,6 +25,7 @@ export default function InventoryValuationScreen() {
   }, [query.data]);
 
   return (
+    <ReportsAccessGate>
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
       <View className="flex-row items-center justify-between border-b border-border px-4 py-3 dark:border-border-dark">
         <Pressable onPress={() => router.back()} hitSlop={10}>
@@ -78,5 +80,6 @@ export default function InventoryValuationScreen() {
         />
       )}
     </SafeAreaView>
+    </ReportsAccessGate>
   );
 }

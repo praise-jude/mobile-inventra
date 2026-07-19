@@ -11,6 +11,12 @@ import { signIn } from '@/lib/actions/auth';
 import { haptics } from '@/lib/haptics';
 import { type LoginInput, loginSchema } from '@/lib/validation/auth';
 
+// MFA step-up (if the account has 2FA enabled) is NOT handled inline here —
+// signIn() sets a valid AAL1 session immediately, and the root navigator's
+// needsMfaStepUp gate (see _layout.tsx, auth-context.tsx) takes over from
+// there and routes to (mfa-challenge) before this screen's own re-render
+// would even happen. Keeping that logic at the root instead of duplicating
+// it here also covers any future non-password login path (e.g. OAuth).
 export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);

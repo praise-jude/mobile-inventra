@@ -55,7 +55,8 @@
           "photosPermission": "Royal Inventra uses your photo library to add product photos.",
           "cameraPermission": "Royal Inventra uses your camera to take product photos."
         }
-      ]
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

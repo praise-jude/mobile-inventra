@@ -9,10 +9,19 @@ import { TextField } from '@/components/ui/text-field';
 import { inviteMember } from '@/lib/actions/team';
 import { haptics } from '@/lib/haptics';
 import { useTeamMembers, useBranches } from '@/lib/hooks/use-team';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
+import { isAdminRole } from '@/lib/roles';
 
-const ROLE_OPTIONS = [
+const ADMIN_ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
+  { value: 'cashier', label: 'Cashier' },
+  { value: 'warehouse', label: 'Warehouse' },
+];
+// A Manager may only invite Staff — enforced again server-side in
+// Inventra/lib/team-service.ts's MANAGER_INVITABLE_ROLES, this just keeps
+// the picker from offering a choice the server would reject.
+const MANAGER_ROLE_OPTIONS = [
   { value: 'cashier', label: 'Cashier' },
   { value: 'warehouse', label: 'Warehouse' },
 ];
@@ -22,6 +31,9 @@ const ROLE_OPTIONS = [
 export default function InviteMemberScreen() {
   const teamQuery = useTeamMembers();
   const branchesQuery = useBranches();
+  const profileQuery = useMyProfile();
+  const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
+  const ROLE_OPTIONS = isAdmin ? ADMIN_ROLE_OPTIONS : MANAGER_ROLE_OPTIONS;
   const [form, setForm] = useState({ email: '', firstName: '', lastName: '', role: 'cashier', branchId: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

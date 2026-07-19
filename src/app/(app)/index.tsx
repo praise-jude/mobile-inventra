@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useHasPermission } from '@/lib/hooks/use-permissions';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 import { isManagerRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
@@ -85,6 +86,7 @@ export default function DashboardScreen() {
     },
     enabled: !!session,
   });
+  const reportsPermissionQuery = useHasPermission('reports', 'view');
 
   function handleRefresh() {
     void dashboardQuery.refetch();
@@ -176,10 +178,24 @@ export default function DashboardScreen() {
         contentContainerClassName="px-5 pb-10 pt-2"
         refreshControl={<RefreshControl refreshing={dashboardQuery.isRefetching} onRefresh={handleRefresh} />}
       >
-        <Text className="text-[22px] font-bold tracking-tight text-text dark:text-text-dark">
-          {greeting.emoji} {greeting.label}, {profile.first_name}
-        </Text>
-        <Text className="mt-0.5 text-[13px] text-text-2 dark:text-text-2-dark">{today}</Text>
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1">
+            <Text className="text-[22px] font-bold tracking-tight text-text dark:text-text-dark">
+              {greeting.emoji} {greeting.label}, {profile.first_name}
+            </Text>
+            <Text className="mt-0.5 text-[13px] text-text-2 dark:text-text-2-dark">{today}</Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              haptics.tap();
+              router.push('/notifications');
+            }}
+            hitSlop={10}
+            className="h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface dark:border-border-dark dark:bg-surface-dark"
+          >
+            <Text className="text-[15px]">🔔</Text>
+          </Pressable>
+        </View>
 
         <View className="mt-4 flex-row flex-wrap gap-3">
           {kpiCards.map((k) => (
@@ -312,7 +328,7 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {isManagerTier && (
+        {reportsPermissionQuery.data === true && (
           <Pressable
             onPress={() => {
               haptics.tap();

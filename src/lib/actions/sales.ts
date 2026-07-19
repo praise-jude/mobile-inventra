@@ -3,7 +3,7 @@
 // direct client write rather than a bearer-token API route — the one
 // meaningful difference from web is documented below on recordSale.
 import { logAudit } from '@/lib/actions/audit';
-import { isManagerRole } from '@/lib/roles';
+import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { PaymentMethod, Profile } from '@/types/database';
@@ -38,6 +38,7 @@ export interface RecordSaleInput {
 export async function recordSale(input: RecordSaleInput): Promise<string> {
   const profile = await requireProfile();
   requireSalesRole(profile);
+  await requirePermission('sales', 'create');
 
   if (input.items.length === 0) throw new Error('Add at least one product to the sale.');
   for (const item of input.items) {
@@ -147,6 +148,7 @@ export interface UpdateSaleInput {
 
 export async function updateSale(id: string, input: UpdateSaleInput): Promise<void> {
   const profile = await requireProfile();
+  await requirePermission('sales', 'edit');
 
   const { data: updated, error: saleError } = await supabase
     .from('sales')
@@ -187,9 +189,7 @@ export async function updateSale(id: string, input: UpdateSaleInput): Promise<vo
 // sales row delete then cascades to sale_payments.
 export async function deleteSale(id: string): Promise<void> {
   const profile = await requireProfile();
-  if (!isManagerRole(profile.role)) {
-    throw new Error('Only an owner, admin, or manager can delete a sale.');
-  }
+  await requirePermission('sales', 'delete');
 
   const { data: sale, error: saleError } = await supabase.from('sales').select('id, total').eq('id', id).maybeSingle();
   if (saleError) throw new Error('Could not load this sale.');

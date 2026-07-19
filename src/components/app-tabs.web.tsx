@@ -34,6 +34,7 @@ const TABS = [
 const HIDDEN_TABS = [
   { name: 'reports', href: '/reports' },
   { name: 'team', href: '/team' },
+  { name: 'notifications', href: '/notifications' },
 ] as const;
 
 export default function AppTabs() {

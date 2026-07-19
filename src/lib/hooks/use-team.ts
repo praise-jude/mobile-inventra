@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -54,6 +55,26 @@ export function useTeamMembers() {
     },
     enabled: !!session,
   });
+
+  // Live sync: another session (a Manager approving someone from web, an
+  // Admin changing a role from a different device) updates this table
+  // without this screen doing anything — no `filter` needed, Realtime is
+  // RLS-aware per connection so this only ever receives rows this session
+  // could already SELECT (i.e. same-org), same as Inventra/components/
+  // team/TeamClient.tsx's channel.
+  useEffect(() => {
+    if (!session) return;
+    const channel = supabase
+      .channel(`team:user:${session.user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['team-members'] });
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [session, queryClient]);
 
   return {
     ...query,

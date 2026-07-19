@@ -63,6 +63,7 @@ export type Profile = {
   rejected_reason: string | null;
   approved_by: string | null;
   approved_at: string | null;
+  invited_by: string | null;
   created_at: string;
 };
 
@@ -220,6 +221,7 @@ export type AccessGateState = {
   subscription_status: SubscriptionStatus | null;
   trial_ends_at: string | null;
   cancel_at_period_end: boolean;
+  member_status: MemberStatus | null;
 };
 
 // Dashboard RPC return shapes — mirror the matching interfaces in
@@ -362,6 +364,61 @@ export type AuditLog = {
   created_at: string;
 };
 
+// Read-only from mobile (src/lib/actions/mfa.ts's getRecoveryCodeCount) —
+// RLS only allows a user to SELECT their own rows; generating/consuming
+// codes needs the service-role key and goes through the bearer-token
+// app/api/mobile/mfa/* routes instead, same split as Team's admin-API
+// actions.
+export type MfaRecoveryCode = {
+  id: string;
+  user_id: string;
+  code_hash: string;
+  used: boolean;
+  used_at: string | null;
+  created_at: string;
+};
+
+// In-app notification feed — mirrors Inventra/lib/notifications-service.ts.
+// Mobile both reads its own feed and inserts notifications for other org
+// members directly (approve/reject in src/lib/actions/team.ts), same as
+// audit_logs — RLS (notifications_insert_org) is the real gate, not a
+// bearer-token route.
+export type NotificationRow = {
+  id: string;
+  org_id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  read_at: string | null;
+  created_at: string;
+};
+
+// Expo push token per device — src/lib/actions/notifications.ts registers
+// this on launch (native only; see registerPushToken's Platform.OS guard).
+export type PushToken = {
+  id: string;
+  user_id: string;
+  token: string;
+  platform: string;
+  created_at: string;
+};
+
+// Admin-editable per-role permission overrides — see
+// Inventra/supabase/migrations/20260719120000_role_permissions.sql.
+export type RolePermissionRow = {
+  id: string;
+  org_id: string;
+  role: 'manager' | 'cashier' | 'warehouse';
+  module: string;
+  action: string;
+  allowed: boolean;
+  updated_by: string | null;
+  updated_at: string;
+};
+
 type TableDef<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
@@ -432,6 +489,18 @@ export type Database = {
       audit_logs: TableDef<AuditLog, Omit<AuditLog, 'id' | 'created_at'> & { id?: string }, never>;
       notification_settings: TableDef<NotificationSettings, never, Partial<Omit<NotificationSettings, 'org_id'>>>;
       print_settings: TableDef<PrintSettings, never, Partial<Omit<PrintSettings, 'org_id'>>>;
+      mfa_recovery_codes: TableDef<MfaRecoveryCode, never, never>;
+      notifications: TableDef<
+        NotificationRow,
+        Omit<NotificationRow, 'id' | 'created_at' | 'read_at'> & { id?: string },
+        Partial<Pick<NotificationRow, 'read_at'>>
+      >;
+      push_tokens: TableDef<PushToken, Omit<PushToken, 'id' | 'created_at'> & { id?: string }, never>;
+      role_permissions: TableDef<
+        RolePermissionRow,
+        Omit<RolePermissionRow, 'id' | 'updated_at'> & { id?: string; updated_at?: string },
+        Partial<Pick<RolePermissionRow, 'allowed' | 'updated_by' | 'updated_at'>>
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -478,6 +547,10 @@ export type Database = {
       get_profit_loss: {
         Args: { p_from: string; p_to: string; p_warehouse_id?: string | null; p_product_id?: string | null };
         Returns: ProfitLossRpc;
+      };
+      has_permission: {
+        Args: { p_module: string; p_action: string };
+        Returns: boolean;
       };
     };
     Enums: Record<string, never>;

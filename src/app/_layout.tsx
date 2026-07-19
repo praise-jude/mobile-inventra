@@ -35,22 +35,29 @@ export default function RootLayout() {
   );
 }
 
-// Gate tiers mirror the redirect logic in Inventra/lib/supabase/middleware.ts:
-// first launch on this device -> (intro) (marketing carousel, ends in
-// Sign In/Create Account); no session (intro already seen) -> (auth);
-// session but profile/terms/country incomplete, or profile complete but no
-// card on file yet (awaitingCard) -> (onboarding) (which itself picks the
-// right screen, see (onboarding)/_layout.tsx); onboarded but the
+// Gate tiers mirror the redirect logic in Inventra/lib/supabase/middleware.ts
+// (+ app/pending-approval/page.tsx for the approval tier): first launch on
+// this device -> (intro) (marketing carousel, ends in Sign In/Create
+// Account); no session (intro already seen) -> (auth); session but a second
+// factor is still required (needsMfaStepUp) -> (mfa-challenge) — checked
+// before every other authed gate, same top priority middleware.ts gives it
+// server-side, since password auth alone already sets a valid session and
+// nothing else here should be reachable until that's resolved; session but
+// profile/terms/country incomplete, or profile complete but no card on file
+// yet (awaitingCard) -> (onboarding) (which itself picks the right screen,
+// see (onboarding)/_layout.tsx); onboarded but a Manager-invited member not
+// yet approved -> (pending-approval); onboarded+approved but the
 // trial/subscription has lapsed (blocked) -> (billing); otherwise -> (app).
 // Renders nothing while intro/session/gate state is still resolving so we
 // don't flash the wrong group before redirecting.
 function RootNavigator() {
-  const { session, initializing, gateLoading, needsOnboarding, awaitingCard, blocked } = useAuth();
+  const { session, initializing, gateLoading, aalLoading, needsMfaStepUp, needsOnboarding, awaitingCard, awaitingApproval, blocked } =
+    useAuth();
   const { seen: introSeen } = useIntroSeen();
 
   if (introSeen === null || initializing) return null;
   const authed = !!session;
-  if (authed && gateLoading) return null;
+  if (authed && (gateLoading || aalLoading)) return null;
 
   const needsOnboardingFlow = needsOnboarding || awaitingCard;
 
@@ -64,15 +71,23 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={authed && needsOnboardingFlow}>
+      <Stack.Protected guard={authed && needsMfaStepUp}>
+        <Stack.Screen name="(mfa-challenge)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={authed && !needsMfaStepUp && needsOnboardingFlow}>
         <Stack.Screen name="(onboarding)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={authed && !needsOnboardingFlow && blocked}>
+      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboardingFlow && awaitingApproval}>
+        <Stack.Screen name="(pending-approval)" />
+      </Stack.Protected>
+
+      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboardingFlow && !awaitingApproval && blocked}>
         <Stack.Screen name="(billing)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={authed && !needsOnboardingFlow && !blocked}>
+      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboardingFlow && !awaitingApproval && !blocked}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
     </Stack>
