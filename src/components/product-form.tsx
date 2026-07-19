@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
@@ -44,7 +44,6 @@ export function ProductForm({
     control,
     handleSubmit,
     setValue,
-    watch,
     formState: { isSubmitting },
   } = useForm<ProductFormInput>({
     resolver: zodResolver(productFormSchema),
@@ -62,7 +61,9 @@ export function ProductForm({
     },
   });
 
-  const skuValue = watch('sku');
+  // useWatch (not the form's watch() escape hatch) — see signup.tsx's
+  // matching comment: watch() defeats React Compiler's memoization.
+  const skuValue = useWatch({ control, name: 'sku' });
 
   async function pickPhoto() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();

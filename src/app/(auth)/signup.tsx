@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -28,7 +28,6 @@ export default function SignupScreen() {
   const {
     control,
     handleSubmit,
-    watch,
     setValue,
     formState: { isSubmitting },
   } = useForm<SignupInput>({
@@ -46,8 +45,12 @@ export default function SignupScreen() {
     },
   });
 
-  const password = watch('password');
-  const country = watch('country');
+  // useWatch (not the form's watch() escape hatch) — watch() returns a new
+  // function reference every render, which React Compiler can't safely
+  // memoize around, so it bails out of compiling this whole component.
+  // useWatch is a real hook (subscribes via context) and compiles fine.
+  const password = useWatch({ control, name: 'password' });
+  const country = useWatch({ control, name: 'country' });
   const strength = passwordStrength(password);
   const stateOptions = useMemo(
     () => statesForCountry(country).map((s) => ({ value: s, label: s })),

@@ -43,6 +43,13 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
       </NativeTabs.Trigger>
+
+      {/* Reachable via router.push (Dashboard's Reports card, Settings'
+          Team row) but not a bottom-bar destination — NativeTabs still
+          needs each top-level (app)/ route registered as a trigger or
+          navigating to it is a no-op, `hidden` just keeps it off the bar. */}
+      <NativeTabs.Trigger name="reports" hidden />
+      <NativeTabs.Trigger name="team" hidden />
     </NativeTabs>
   );
 }

@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -59,7 +59,6 @@ export default function CompleteOnboardingScreen() {
   const {
     control,
     handleSubmit,
-    watch,
     setValue,
     reset,
     formState: { isSubmitting },
@@ -79,7 +78,9 @@ export default function CompleteOnboardingScreen() {
     });
   }, [profileQuery.data, reset]);
 
-  const country = watch('country');
+  // useWatch (not the form's watch() escape hatch) — see signup.tsx's
+  // matching comment: watch() defeats React Compiler's memoization.
+  const country = useWatch({ control, name: 'country' });
   const stateOptions = useMemo(() => statesForCountry(country ?? '').map((s) => ({ value: s, label: s })), [country]);
 
   async function onSubmit(values: CompleteOnboardingInput) {

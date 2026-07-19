@@ -22,6 +22,20 @@ const TABS = [
   { name: 'settings', href: '/settings', label: 'Settings', icon: '⚙️' },
 ] as const;
 
+// `Tabs` (expo-router/ui) only knows how to route to segments registered as
+// a TabTrigger inside TabList — a `router.push('/reports')` to any other
+// top-level (app)/ route is silently swallowed (stays on the current tab)
+// because the underlying ExpoTabRouter has no entry for it. These two are
+// reachable via in-app navigation (Dashboard's Reports card, Settings'
+// Team row) but shouldn't show as bottom-bar buttons, so they're registered
+// with a zero-size trigger instead of a visible one — same intent as
+// NativeTabs.Trigger's first-class `hidden` prop in app-tabs.tsx, which
+// expo-router/ui has no equivalent for.
+const HIDDEN_TABS = [
+  { name: 'reports', href: '/reports' },
+  { name: 'team', href: '/team' },
+] as const;
+
 export default function AppTabs() {
   return (
     <Tabs>
@@ -32,6 +46,9 @@ export default function AppTabs() {
             <TabTrigger key={tab.name} name={tab.name} href={tab.href} asChild>
               <TabButton icon={tab.icon} label={tab.label} />
             </TabTrigger>
+          ))}
+          {HIDDEN_TABS.map((tab) => (
+            <TabTrigger key={tab.name} name={tab.name} href={tab.href} style={{ display: 'none' }} />
           ))}
         </View>
       </TabList>

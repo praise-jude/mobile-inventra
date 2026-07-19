@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { RefreshControl, ScrollView, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -7,6 +8,7 @@ import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { useAuth } from '@/lib/auth-context';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
+import { haptics } from '@/lib/haptics';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 import { isManagerRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
@@ -309,6 +311,25 @@ export default function DashboardScreen() {
             </View>
           )}
         </View>
+
+        {isManagerTier && (
+          <Pressable
+            onPress={() => {
+              haptics.tap();
+              router.push('/reports');
+            }}
+            className="mt-4 flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark"
+          >
+            <View className="h-10 w-10 items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
+              <Text className="text-[18px]">📈</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-[14px] font-semibold text-text dark:text-text-dark">Reports</Text>
+              <Text className="text-[11.5px] text-muted dark:text-muted-dark">Sales trends, profit &amp; loss, inventory valuation</Text>
+            </View>
+            <Text className="text-text-2 dark:text-text-2-dark">›</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

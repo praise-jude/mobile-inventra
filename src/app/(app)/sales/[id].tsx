@@ -2,13 +2,14 @@ import * as Print from 'expo-print';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { deleteSale, updateSale } from '@/lib/actions/sales';
+import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
@@ -48,14 +49,14 @@ export default function SaleDetailScreen() {
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: saleQuery.data.receiptNumber });
       }
     } catch {
-      Alert.alert('Error', 'Could not generate the receipt.');
+      notifyAlert('Error', 'Could not generate the receipt.');
     } finally {
       setSharing(false);
     }
   }
 
   function handleDelete() {
-    Alert.alert('Delete this sale?', "This reverses its stock impact and can't be undone.", [
+    confirmAlert('Delete this sale?', "This reverses its stock impact and can't be undone.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -67,7 +68,7 @@ export default function SaleDetailScreen() {
             haptics.success();
             router.back();
           } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete this sale.');
+            notifyAlert('Error', err instanceof Error ? err.message : 'Could not delete this sale.');
           } finally {
             setDeleting(false);
           }

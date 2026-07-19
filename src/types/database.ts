@@ -13,7 +13,10 @@
 // here silently collapses every query's inferred Row type to `never`.
 
 export type UserRole = 'owner' | 'admin' | 'manager' | 'cashier' | 'warehouse';
-export type MemberStatus = 'active' | 'invited';
+// 'rejected' and 'suspended' aren't values of this enum — mirrors
+// Inventra's schema, where both are modeled as a nullable timestamp
+// (rejected_at / suspended_at) on top of status, not a status value.
+export type MemberStatus = 'active' | 'invited' | 'awaiting_approval';
 export type SubscriptionStatus =
   | 'trialing'
   | 'active'
@@ -56,6 +59,10 @@ export type Profile = {
   last_active_at: string | null;
   suspended_at: string | null;
   branch_id: string | null;
+  rejected_at: string | null;
+  rejected_reason: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
   created_at: string;
 };
 
@@ -248,6 +255,72 @@ export type StockHealthRow = {
   count: number;
 };
 
+// Reports RPCs — mirror Inventra/supabase/migrations/20260709121312_reports_rpcs.sql
+// exactly (raw snake_case as Postgres returns them; camelCase mapping
+// happens in src/lib/hooks/use-reports.ts, same split as web's
+// lib/queries/reports.ts).
+export type Granularity = 'day' | 'week' | 'month' | 'year';
+
+export type SalesSummaryRpc = {
+  revenue: number;
+  discount: number;
+  tax: number;
+  sales_count: number;
+  profit: number;
+};
+
+export type SalesPeriodRpcRow = {
+  period: string;
+  revenue: number;
+  sales_count: number;
+  profit: number;
+};
+
+export type SalesByBranchRpcRow = {
+  warehouse_id: string;
+  warehouse_name: string;
+  revenue: number;
+  sales_count: number;
+};
+
+export type SalesByProductRpcRow = {
+  product_id: string;
+  name: string;
+  sku: string;
+  units: number;
+  revenue: number;
+  profit: number;
+};
+
+export type SalesByStaffRpcRow = {
+  staff_id: string | null;
+  staff_name: string;
+  revenue: number;
+  sales_count: number;
+};
+
+export type InventoryValuationRpcRow = {
+  product_id: string;
+  name: string;
+  sku: string;
+  warehouse_id: string | null;
+  warehouse_name: string | null;
+  qty_on_hand: number;
+  cost_price: number;
+  sell_price: number;
+  inventory_value: number;
+  expected_profit: number;
+};
+
+export type ProfitLossRpc = {
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  operating_expenses: number;
+  net_profit: number;
+  margin_pct: number;
+};
+
 // Mirrors the stock_movements table exactly (init.sql + the sale_id/
 // adjustment_type/notes columns added later) — previously had a wrong
 // `actor_id` field name (the real column is `created_by`) that happened to
@@ -318,7 +391,22 @@ export type Database = {
       profiles: TableDef<
         Profile,
         never,
-        Partial<Pick<Profile, 'terms_accepted' | 'terms_version' | 'terms_accepted_at' | 'terms_accepted_ip'>>
+        Partial<
+          Pick<
+            Profile,
+            | 'terms_accepted'
+            | 'terms_version'
+            | 'terms_accepted_at'
+            | 'terms_accepted_ip'
+            | 'role'
+            | 'status'
+            | 'suspended_at'
+            | 'rejected_at'
+            | 'rejected_reason'
+            | 'approved_by'
+            | 'approved_at'
+          >
+        >
       >;
       // Read-only from the mobile client — every write goes through the
       // bearer-token routes under Inventra's app/api/mobile/billing/, never
@@ -362,6 +450,34 @@ export type Database = {
       get_stock_health: {
         Args: Record<string, never>;
         Returns: StockHealthRow[];
+      };
+      get_sales_summary: {
+        Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };
+        Returns: SalesSummaryRpc;
+      };
+      get_sales_by_period: {
+        Args: { p_from: string; p_to: string; p_granularity: Granularity; p_warehouse_id?: string | null };
+        Returns: SalesPeriodRpcRow[];
+      };
+      get_sales_by_branch: {
+        Args: { p_from: string; p_to: string };
+        Returns: SalesByBranchRpcRow[];
+      };
+      get_sales_by_product: {
+        Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };
+        Returns: SalesByProductRpcRow[];
+      };
+      get_sales_by_staff: {
+        Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };
+        Returns: SalesByStaffRpcRow[];
+      };
+      get_inventory_valuation: {
+        Args: { p_warehouse_id?: string | null };
+        Returns: InventoryValuationRpcRow[];
+      };
+      get_profit_loss: {
+        Args: { p_from: string; p_to: string; p_warehouse_id?: string | null; p_product_id?: string | null };
+        Returns: ProfitLossRpc;
       };
     };
     Enums: Record<string, never>;

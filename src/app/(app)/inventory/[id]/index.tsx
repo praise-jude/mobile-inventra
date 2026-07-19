@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { archiveProduct, deleteProduct, setProductActive } from '@/lib/actions/products';
 import { createAdjustment, transferWarehouseStock } from '@/lib/actions/inventory';
+import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
@@ -58,7 +59,7 @@ export default function ProductDetailScreen() {
       haptics.success();
       invalidate();
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Could not update the product.');
+      notifyAlert('Error', err instanceof Error ? err.message : 'Could not update the product.');
     } finally {
       setBusy(false);
     }
@@ -66,7 +67,7 @@ export default function ProductDetailScreen() {
 
   function handleArchive() {
     if (!productQuery.data) return;
-    Alert.alert('Archive product?', 'This hides it from active lists but keeps its history.', [
+    confirmAlert('Archive product?', 'This hides it from active lists but keeps its history.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Archive',
@@ -78,7 +79,7 @@ export default function ProductDetailScreen() {
             haptics.success();
             router.back();
           } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Could not archive the product.');
+            notifyAlert('Error', err instanceof Error ? err.message : 'Could not archive the product.');
           } finally {
             setBusy(false);
           }
@@ -89,7 +90,7 @@ export default function ProductDetailScreen() {
 
   function handleDelete() {
     if (!productQuery.data) return;
-    Alert.alert('Delete product?', 'This can\'t be undone.', [
+    confirmAlert('Delete product?', 'This can\'t be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -101,7 +102,7 @@ export default function ProductDetailScreen() {
             haptics.success();
             router.back();
           } catch (err) {
-            Alert.alert('Error', err instanceof Error ? err.message : 'Could not delete the product.');
+            notifyAlert('Error', err instanceof Error ? err.message : 'Could not delete the product.');
           } finally {
             setBusy(false);
           }

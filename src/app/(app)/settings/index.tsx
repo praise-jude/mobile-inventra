@@ -10,6 +10,7 @@ import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { isAdminRole } from '@/lib/roles';
 
 const ADMIN_ROWS = [
+  { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
   { href: '/settings/notifications' as const, icon: '🔔', label: 'Notifications', description: 'Low stock, expiring products, weekly digest' },
   { href: '/settings/printing' as const, icon: '🖨️', label: 'Receipts & Printing', description: 'Paper size, auto-print, receipt footer' },
