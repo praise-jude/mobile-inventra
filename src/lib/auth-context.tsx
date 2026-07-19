@@ -64,10 +64,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession);
       queryClient.invalidateQueries({ queryKey: ['access-gate'] });
       queryClient.invalidateQueries({ queryKey: ['mfa-aal'] });
+      // Most query keys in this app (products, sales, inventory, reports,
+      // etc.) aren't scoped by org/user id — on a shared device, a second
+      // person signing in right after a sign-out would otherwise briefly
+      // see the previous session's cached prices/products/sale totals
+      // until each query refetches on its own.
+      if (event === 'SIGNED_OUT') {
+        queryClient.clear();
+      }
     });
 
     return () => subscription.unsubscribe();

@@ -195,8 +195,19 @@ export async function deleteSale(id: string): Promise<void> {
   if (saleError) throw new Error('Could not load this sale.');
   if (!sale) throw new Error('Sale not found.');
 
-  const { error: movementsError } = await supabase.from('stock_movements').delete().eq('sale_id', id);
-  if (movementsError) throw new Error("Could not reverse this sale's stock impact.");
+  // A DELETE that RLS silently filters to 0 rows returns no error at all —
+  // if this role has sales:delete but not inventory:delete_movement
+  // (independently configurable via role_permissions), the movements would
+  // never get removed, but without this check the sale row would still be
+  // deleted right after, permanently desyncing the stock ledger.
+  const { count: movementCount } = await supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('sale_id', id);
+  if ((movementCount ?? 0) > 0) {
+    const { data: deletedMovements, error: movementsError } = await supabase.from('stock_movements').delete().eq('sale_id', id).select('id');
+    if (movementsError) throw new Error("Could not reverse this sale's stock impact.");
+    if (!deletedMovements || deletedMovements.length === 0) {
+      throw new Error("Could not reverse this sale's stock impact — you may be missing the permission needed to delete stock movements.");
+    }
+  }
 
   const { error: deleteError } = await supabase.from('sales').delete().eq('id', id);
   if (deleteError) throw new Error('Could not delete the sale.');
