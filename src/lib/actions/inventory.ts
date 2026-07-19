@@ -19,7 +19,10 @@ export async function createCategory(name: string): Promise<Category> {
     .insert({ org_id: profile.org_id, name: name.trim(), emoji: null })
     .select('*')
     .single();
-  if (error) throw new Error('Could not create category.');
+  if (error) {
+    if (error.code === '23505') throw new Error('A category with this name already exists.');
+    throw new Error('Could not create category.');
+  }
   return data as Category;
 }
 
@@ -30,7 +33,10 @@ export async function createSupplier(name: string): Promise<Supplier> {
     .insert({ org_id: profile.org_id, name: name.trim() })
     .select('*')
     .single();
-  if (error) throw new Error('Could not create supplier.');
+  if (error) {
+    if (error.code === '23505') throw new Error('A supplier with this name already exists.');
+    throw new Error('Could not create supplier.');
+  }
   return data as Supplier;
 }
 

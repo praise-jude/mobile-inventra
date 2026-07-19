@@ -327,43 +327,54 @@ function PickerWithInlineAdd({
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <View>
       <SelectField label={label} placeholder={`Select ${label.toLowerCase()}…`} searchable value={value ?? ''} options={options} onChange={onChange} />
       {adding ? (
-        <View className="mt-2 flex-row items-center gap-2">
-          <View className="flex-1">
-            <TextField placeholder={`New ${label.toLowerCase()} name`} value={newName} onChangeText={setNewName} autoFocus />
+        <View className="mt-2">
+          <View className="flex-row items-center gap-2">
+            <View className="flex-1">
+              <TextField placeholder={`New ${label.toLowerCase()} name`} value={newName} onChangeText={setNewName} autoFocus />
+            </View>
+            {busy ? (
+              <ActivityIndicator />
+            ) : (
+              <>
+                <Pressable
+                  onPress={async () => {
+                    if (!newName.trim()) return;
+                    setBusy(true);
+                    setError(null);
+                    try {
+                      await onCreate(newName.trim());
+                      setAdding(false);
+                      setNewName('');
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : `Could not create this ${label.toLowerCase()}.`);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                  hitSlop={8}
+                >
+                  <Text className="text-[13px] font-semibold text-accent-text dark:text-accent-text-dark">Save</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setAdding(false);
+                    setNewName('');
+                    setError(null);
+                  }}
+                  hitSlop={8}
+                >
+                  <Text className="text-[13px] font-semibold text-text-2 dark:text-text-2-dark">Cancel</Text>
+                </Pressable>
+              </>
+            )}
           </View>
-          {busy ? (
-            <ActivityIndicator />
-          ) : (
-            <>
-              <Pressable
-                onPress={async () => {
-                  if (!newName.trim()) return;
-                  setBusy(true);
-                  await onCreate(newName.trim());
-                  setBusy(false);
-                  setAdding(false);
-                  setNewName('');
-                }}
-                hitSlop={8}
-              >
-                <Text className="text-[13px] font-semibold text-accent-text dark:text-accent-text-dark">Save</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setAdding(false);
-                  setNewName('');
-                }}
-                hitSlop={8}
-              >
-                <Text className="text-[13px] font-semibold text-text-2 dark:text-text-2-dark">Cancel</Text>
-              </Pressable>
-            </>
-          )}
+          {error && <Text className="mt-1 text-[12px] font-medium text-red dark:text-red-dark">{error}</Text>}
         </View>
       ) : (
         <Pressable onPress={() => setAdding(true)} className="mt-1.5">

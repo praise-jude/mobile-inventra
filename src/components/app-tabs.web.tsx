@@ -4,6 +4,16 @@ import { Pressable, Text, View } from 'react-native';
 // Web build of the tab shell (expo-router/ui's JS-based Tabs, since
 // NativeTabs — see app-tabs.tsx — is iOS/Android only) — same 5 sections,
 // same brand tokens, just a floating pill bar instead of a native tab bar.
+//
+// That bar is `position: absolute`, so unlike a native tab bar it doesn't
+// automatically reserve its own space — every screen's content would
+// otherwise render underneath it, with the bar visually overlapping (and
+// intercepting taps on) anything scrolled to the bottom, e.g. a form's
+// submit button. TAB_BAR_HEIGHT (measured: ~52px) is reserved via
+// paddingBottom on TabSlot below, once, instead of every screen needing its
+// own bottom padding to clear it.
+export const TAB_BAR_HEIGHT = 56;
+
 const TABS = [
   { name: 'index', href: '/', label: 'Dashboard', icon: '▦' },
   { name: 'sales', href: '/sales', label: 'Sales', icon: '🧾' },
@@ -15,7 +25,7 @@ const TABS = [
 export default function AppTabs() {
   return (
     <Tabs>
-      <TabSlot style={{ height: '100%' }} />
+      <TabSlot style={{ height: '100%', paddingBottom: TAB_BAR_HEIGHT }} />
       <TabList asChild>
         <View className="absolute bottom-0 w-full flex-row justify-center border-t border-border bg-surface px-2 py-2 dark:border-border-dark dark:bg-surface-dark">
           {TABS.map((tab) => (
