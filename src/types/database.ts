@@ -257,6 +257,35 @@ export type StockHealthRow = {
   count: number;
 };
 
+export type CategoryMixRow = {
+  name: string;
+  value: number;
+  pct: number;
+};
+
+export type DailyProductProfitRow = {
+  product_id: string;
+  name: string;
+  emoji: string | null;
+  units: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+};
+
+export type MonthlyRevenueProfitRow = {
+  month: string;
+  revenue: number;
+  profit: number;
+};
+
+export type MonthlySalesVolumeRow = {
+  month: string;
+  count: number;
+};
+
+export type ExpenseCategory = 'rent' | 'salary' | 'transport' | 'utilities' | 'inventory_purchase' | 'logistics' | 'miscellaneous';
+
 // Reports RPCs — mirror Inventra/supabase/migrations/20260709121312_reports_rpcs.sql
 // exactly (raw snake_case as Postgres returns them; camelCase mapping
 // happens in src/lib/hooks/use-reports.ts, same split as web's
@@ -462,6 +491,7 @@ export type Database = {
             | 'rejected_reason'
             | 'approved_by'
             | 'approved_at'
+            | 'last_active_at'
           >
         >
       >;
@@ -519,6 +549,22 @@ export type Database = {
       get_stock_health: {
         Args: Record<string, never>;
         Returns: StockHealthRow[];
+      };
+      get_category_mix: {
+        Args: Record<string, never>;
+        Returns: CategoryMixRow[];
+      };
+      get_daily_product_profit: {
+        Args: Record<string, never>;
+        Returns: DailyProductProfitRow[];
+      };
+      get_monthly_revenue_profit: {
+        Args: Record<string, never>;
+        Returns: MonthlyRevenueProfitRow[];
+      };
+      get_monthly_sales_volume: {
+        Args: Record<string, never>;
+        Returns: MonthlySalesVolumeRow[];
       };
       get_sales_summary: {
         Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };

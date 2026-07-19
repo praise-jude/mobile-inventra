@@ -3,29 +3,55 @@ import { router } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AreaChart } from '@/components/charts/area-chart';
+import { DonutChart } from '@/components/charts/donut-chart';
+import { DailyProfitList } from '@/components/daily-profit-list';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
+import { TeamPresenceCard } from '@/components/team-presence-card';
+import { DONUT_PALETTE } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
+import { useTeamMembers } from '@/lib/hooks/use-team';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 import { isManagerRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
-import type { StockHealthRow } from '@/types/database';
+import type { CategoryMixRow, DailyProductProfitRow, ExpenseCategory, MonthlyRevenueProfitRow, MonthlySalesVolumeRow, StockHealthRow } from '@/types/database';
 
-// Mirrors Inventra/app/(app)/dashboard/page.tsx, trimmed to what fits a
-// mobile home screen: KPI grid, stock health, top sellers, recent activity.
-// Charts/category-mix/expense-breakdown/team-presence/daily-profit-table are
-// deliberately out of scope for this pass — see the (app) tab shell's
-// <ComingSoon /> sections for those.
+// Mirrors Inventra/app/(app)/dashboard/page.tsx in full: KPI grid, trend
+// charts (sales/revenue/profit), category mix + expense breakdown donuts,
+// top sellers, stock health, recent activity, team presence, and today's
+// per-product profit — all the Manager-tier+ sections that an earlier pass
+// deliberately left out are wired in here now, sharing the same RPCs/
+// tables and the same Realtime presence channel as web.
 const STOCK_HEALTH_META: Record<string, { label: string; barClass: string }> = {
   in_stock: { label: 'Healthy stock', barClass: 'bg-green dark:bg-green-dark' },
   low_stock: { label: 'Low stock', barClass: 'bg-amber dark:bg-amber-dark' },
   out_of_stock: { label: 'Out of stock', barClass: 'bg-red dark:bg-red-dark' },
   expiring: { label: 'Expiring < 7 days', barClass: 'bg-sky dark:bg-sky-dark' },
 };
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
+  rent: 'Rent',
+  salary: 'Salary',
+  transport: 'Transport',
+  utilities: 'Utilities',
+  inventory_purchase: 'Inventory Purchase',
+  logistics: 'Logistics',
+  miscellaneous: 'Miscellaneous',
+};
+
+// expenses.incurred_at is a plain `date` (no time component) — mirrors
+// Inventra/lib/queries/expenses.ts's dateKeyInTz, timezone only matters for
+// determining what "today" (and 30 days back) actually is in the org's zone.
+function dateKeyInTz(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
 
 interface ActivityRow {
   id: string;
@@ -35,6 +61,13 @@ interface ActivityRow {
   created_at: string;
   products: { name: string } | null;
   profiles: { first_name: string; last_name: string } | null;
+}
+
+interface ExpenseBreakdownRow {
+  category: ExpenseCategory;
+  label: string;
+  amount: number;
+  pct: number;
 }
 
 export default function DashboardScreen() {
@@ -59,20 +92,83 @@ export default function DashboardScreen() {
 
       const isManagerTier = isManagerRole(profile.role);
 
-      const [kpisRes, topSellersRes, stockHealthRes, activityRes] = await Promise.all([
-        supabase.rpc('get_kpis'),
-        supabase.rpc('get_top_sellers', { p_limit: 5 }),
-        supabase.rpc('get_stock_health'),
-        supabase
-          .from('stock_movements')
-          .select('id, type, qty_delta, reason, created_at, products(name), profiles(first_name, last_name)')
-          .order('created_at', { ascending: false })
-          .limit(5),
-      ]);
+      const [kpisRes, topSellersRes, stockHealthRes, activityRes, categoryMixRes, revenueProfitRes, salesVolumeRes, dailyProfitRes, expensesRes] =
+        await Promise.all([
+          supabase.rpc('get_kpis'),
+          supabase.rpc('get_top_sellers', { p_limit: 5 }),
+          supabase.rpc('get_stock_health'),
+          supabase
+            .from('stock_movements')
+            .select('id, type, qty_delta, reason, created_at, products(name), profiles(first_name, last_name)')
+            .order('created_at', { ascending: false })
+            .limit(5),
+          isManagerTier ? supabase.rpc('get_category_mix') : Promise.resolve({ data: [] as CategoryMixRow[], error: null }),
+          isManagerTier ? supabase.rpc('get_monthly_revenue_profit') : Promise.resolve({ data: [] as MonthlyRevenueProfitRow[], error: null }),
+          isManagerTier ? supabase.rpc('get_monthly_sales_volume') : Promise.resolve({ data: [] as MonthlySalesVolumeRow[], error: null }),
+          isManagerTier ? supabase.rpc('get_daily_product_profit') : Promise.resolve({ data: [] as DailyProductProfitRow[], error: null }),
+          isManagerTier
+            ? supabase
+                .from('expenses')
+                .select('category, amount')
+                .gte('incurred_at', dateKeyInTz(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), org.timezone))
+            : Promise.resolve({ data: [] as { category: ExpenseCategory; amount: number }[], error: null }),
+        ]);
       if (kpisRes.error) throw kpisRes.error;
       if (topSellersRes.error) throw topSellersRes.error;
       if (stockHealthRes.error) throw stockHealthRes.error;
       if (activityRes.error) throw activityRes.error;
+      if (categoryMixRes.error) throw categoryMixRes.error;
+      if (revenueProfitRes.error) throw revenueProfitRes.error;
+      if (salesVolumeRes.error) throw salesVolumeRes.error;
+      if (dailyProfitRes.error) throw dailyProfitRes.error;
+      if (expensesRes.error) throw expensesRes.error;
+
+      // Expense category totals over the trailing 30 days, mirroring
+      // Inventra/lib/queries/expenses.ts's getExpenseCategoryBreakdown.
+      const expenseTotals = new Map<ExpenseCategory, number>();
+      let expenseGrandTotal = 0;
+      for (const row of expensesRes.data ?? []) {
+        const amount = Number(row.amount);
+        expenseTotals.set(row.category, (expenseTotals.get(row.category) ?? 0) + amount);
+        expenseGrandTotal += amount;
+      }
+      const expenseBreakdown: ExpenseBreakdownRow[] = Array.from(expenseTotals.entries())
+        .map(([category, amount]) => ({
+          category,
+          label: EXPENSE_CATEGORY_LABEL[category],
+          amount,
+          pct: expenseGrandTotal > 0 ? Math.round((amount / expenseGrandTotal) * 100) : 0,
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      // Revenue/profit and sales-volume are sparse (only months with real
+      // activity come back) and fetched independently, so they're each
+      // looked up against one canonical last-12-months axis rather than
+      // zipped positionally — mirrors Inventra/app/(app)/dashboard/page.tsx.
+      const monthCursor = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 11, 1));
+      const canonicalMonths: { key: string; label: string }[] = [];
+      for (let i = 0; i < 12; i++) {
+        canonicalMonths.push({
+          key: `${monthCursor.getUTCFullYear()}-${String(monthCursor.getUTCMonth() + 1).padStart(2, '0')}`,
+          label: MONTH_NAMES[monthCursor.getUTCMonth()],
+        });
+        monthCursor.setUTCMonth(monthCursor.getUTCMonth() + 1);
+      }
+      const revenueByMonth = new Map((revenueProfitRes.data ?? []).map((m) => [m.month.slice(0, 7), Number(m.revenue)]));
+      const profitByMonth = new Map((revenueProfitRes.data ?? []).map((m) => [m.month.slice(0, 7), Number(m.profit)]));
+      const salesByMonth = new Map((salesVolumeRes.data ?? []).map((m) => [m.month.slice(0, 7), Number(m.count)]));
+
+      const chartMonths = canonicalMonths.map((m) => m.label);
+      const revenueValues = canonicalMonths.map((m) => revenueByMonth.get(m.key) ?? 0);
+      const profitValues = canonicalMonths.map((m) => profitByMonth.get(m.key) ?? 0);
+      const salesVolumeValues = canonicalMonths.map((m) => salesByMonth.get(m.key) ?? 0);
+
+      const dailyProfit = dailyProfitRes.data ?? [];
+      const todaysProfit = dailyProfit.reduce((sum, p) => sum + (Number(p.profit) || 0), 0);
+
+      const categoryMix = categoryMixRes.data ?? [];
+      const totalCategoryValue = categoryMix.reduce((sum, c) => sum + Number(c.value), 0);
+      const totalExpenseValue = expenseBreakdown.reduce((sum, e) => sum + e.amount, 0);
 
       return {
         profile,
@@ -82,11 +178,22 @@ export default function DashboardScreen() {
         topSellers: topSellersRes.data ?? [],
         stockHealth: (stockHealthRes.data ?? []) as StockHealthRow[],
         activity: (activityRes.data ?? []) as unknown as ActivityRow[],
+        categoryMix,
+        totalCategoryValue,
+        expenseBreakdown,
+        totalExpenseValue,
+        chartMonths,
+        revenueValues,
+        profitValues,
+        salesVolumeValues,
+        dailyProfit,
+        todaysProfit,
       };
     },
     enabled: !!session,
   });
   const reportsPermissionQuery = useHasPermission('reports', 'view');
+  const teamMembersQuery = useTeamMembers();
 
   function handleRefresh() {
     void dashboardQuery.refetch();
@@ -118,7 +225,25 @@ export default function DashboardScreen() {
     );
   }
 
-  const { profile, org, isManagerTier, kpis, topSellers, stockHealth, activity } = dashboardQuery.data;
+  const {
+    profile,
+    org,
+    isManagerTier,
+    kpis,
+    topSellers,
+    stockHealth,
+    activity,
+    categoryMix,
+    totalCategoryValue,
+    expenseBreakdown,
+    totalExpenseValue,
+    chartMonths,
+    revenueValues,
+    profitValues,
+    salesVolumeValues,
+    dailyProfit,
+    todaysProfit,
+  } = dashboardQuery.data;
   const greeting = greetingFor(org.timezone);
   const today = formatTodayHeader(org.timezone);
   const totalStock = stockHealth.reduce((sum, s) => (s.label === 'expiring' ? sum : sum + Number(s.count)), 0);
@@ -223,31 +348,71 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        <View className="mt-5 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
-          <Text className="mb-0.5 text-[15px] font-bold text-text dark:text-text-dark">Stock health</Text>
-          <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">Across your catalog</Text>
-          <View className="gap-3">
-            {stockHealth.map((s) => {
-              const meta = STOCK_HEALTH_META[s.label];
-              const pct = Math.min(100, Math.round((Number(s.count) / Math.max(totalStock, 1)) * 100));
-              return (
-                <View key={s.label}>
-                  <View className="mb-1.5 flex-row justify-between">
-                    <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">
-                      {meta?.label ?? s.label}
-                    </Text>
-                    <Text className="font-mono text-[12.5px] font-bold text-text dark:text-text-dark">
-                      {formatNumber(s.count)}
-                    </Text>
-                  </View>
-                  <View className="h-2 overflow-hidden rounded-[6px] bg-border-2 dark:bg-border-2-dark">
-                    <View className={`h-full rounded-[6px] ${meta?.barClass ?? 'bg-accent'}`} style={{ width: `${pct}%` }} />
-                  </View>
+        {isManagerTier && (
+          <>
+            <View className="mt-5 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="text-[15px] font-bold text-text dark:text-text-dark">Sales trend</Text>
+              <Text className="mb-1.5 text-[12px] text-muted dark:text-muted-dark">Transactions · last 12 months</Text>
+              <AreaChart months={chartMonths} series={[{ key: 'sales', color: '#0891b2', values: salesVolumeValues }]} idPrefix="sales" />
+            </View>
+
+            <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="text-[15px] font-bold text-text dark:text-text-dark">Revenue trend</Text>
+              <Text className="mb-1.5 text-[12px] text-muted dark:text-muted-dark">Last 12 months</Text>
+              <AreaChart months={chartMonths} series={[{ key: 'revenue', color: '#2563eb', values: revenueValues }]} idPrefix="revenue" />
+            </View>
+
+            <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="text-[15px] font-bold text-text dark:text-text-dark">Monthly profit</Text>
+              <Text className="mb-1.5 text-[12px] text-muted dark:text-muted-dark">Last 12 months</Text>
+              <AreaChart months={chartMonths} series={[{ key: 'profit', color: '#10b981', values: profitValues }]} idPrefix="profit" />
+            </View>
+
+            <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="text-[15px] font-bold text-text dark:text-text-dark">Category mix</Text>
+              <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">Share of inventory value</Text>
+              <View className="flex-row items-center gap-3.5">
+                <DonutChart data={categoryMix} totalLabel={formatMoney(totalCategoryValue, org.currency)} />
+                <View className="flex-1 gap-2.5">
+                  {categoryMix.length === 0 && (
+                    <EmptyState compact icon="🗂️" title="No inventory value yet" description="Add products to see category share." />
+                  )}
+                  {categoryMix.slice(0, 5).map((c, i) => (
+                    <View key={c.name} className="flex-row items-center gap-2">
+                      <View className="h-[9px] w-[9px] rounded-[3px]" style={{ backgroundColor: DONUT_PALETTE[i % DONUT_PALETTE.length] }} />
+                      <Text className="flex-1 text-[12.5px] text-text-2 dark:text-text-2-dark" numberOfLines={1}>
+                        {c.name}
+                      </Text>
+                      <Text className="font-mono text-[12.5px] font-bold text-text dark:text-text-dark">{c.pct}%</Text>
+                    </View>
+                  ))}
                 </View>
-              );
-            })}
-          </View>
-        </View>
+              </View>
+            </View>
+
+            <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="text-[15px] font-bold text-text dark:text-text-dark">Expense breakdown</Text>
+              <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">Last 30 days by category</Text>
+              <View className="flex-row items-center gap-3.5">
+                <DonutChart data={expenseBreakdown.map((e) => ({ name: e.label, pct: e.pct }))} totalLabel={formatMoney(totalExpenseValue, org.currency)} />
+                <View className="flex-1 gap-2.5">
+                  {expenseBreakdown.length === 0 && (
+                    <EmptyState compact icon="💸" title="No expenses recorded" description="Log an expense to see the breakdown." />
+                  )}
+                  {expenseBreakdown.slice(0, 5).map((e, i) => (
+                    <View key={e.category} className="flex-row items-center gap-2">
+                      <View className="h-[9px] w-[9px] rounded-[3px]" style={{ backgroundColor: DONUT_PALETTE[i % DONUT_PALETTE.length] }} />
+                      <Text className="flex-1 text-[12.5px] text-text-2 dark:text-text-2-dark" numberOfLines={1}>
+                        {e.label}
+                      </Text>
+                      <Text className="font-mono text-[12.5px] font-bold text-text dark:text-text-dark">{e.pct}%</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </>
+        )}
 
         <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
           <Text className="mb-3.5 text-[15px] font-bold text-text dark:text-text-dark">Top sellers</Text>
@@ -292,6 +457,32 @@ export default function DashboardScreen() {
         </View>
 
         <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+          <Text className="mb-0.5 text-[15px] font-bold text-text dark:text-text-dark">Stock health</Text>
+          <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">Across your catalog</Text>
+          <View className="gap-3">
+            {stockHealth.map((s) => {
+              const meta = STOCK_HEALTH_META[s.label];
+              const pct = Math.min(100, Math.round((Number(s.count) / Math.max(totalStock, 1)) * 100));
+              return (
+                <View key={s.label}>
+                  <View className="mb-1.5 flex-row justify-between">
+                    <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">
+                      {meta?.label ?? s.label}
+                    </Text>
+                    <Text className="font-mono text-[12.5px] font-bold text-text dark:text-text-dark">
+                      {formatNumber(s.count)}
+                    </Text>
+                  </View>
+                  <View className="h-2 overflow-hidden rounded-[6px] bg-border-2 dark:bg-border-2-dark">
+                    <View className={`h-full rounded-[6px] ${meta?.barClass ?? 'bg-accent'}`} style={{ width: `${pct}%` }} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
           <View className="mb-3.5 flex-row items-center justify-between">
             <Text className="text-[15px] font-bold text-text dark:text-text-dark">Recent activity</Text>
             <View className="h-[7px] w-[7px] rounded-full bg-green dark:bg-green-dark" />
@@ -327,6 +518,30 @@ export default function DashboardScreen() {
             </View>
           )}
         </View>
+
+        {isManagerTier && teamMembersQuery.data && (
+          <View className="mt-4">
+            <TeamPresenceCard members={teamMembersQuery.data} />
+          </View>
+        )}
+
+        {isManagerTier && (
+          <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+            <View className="mb-3.5 flex-row items-start justify-between">
+              <View className="flex-1">
+                <Text className="text-[15px] font-bold text-text dark:text-text-dark">Today&apos;s profit by product</Text>
+                <Text className="text-[12px] text-muted dark:text-muted-dark">Cost vs. sale price × units sold today</Text>
+              </View>
+              <View className="items-end">
+                <Text className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-muted dark:text-muted-dark">Today&apos;s profit</Text>
+                <Text className={`font-mono text-[17px] font-bold ${todaysProfit >= 0 ? 'text-green dark:text-green-dark' : 'text-red dark:text-red-dark'}`}>
+                  {formatMoney(todaysProfit, org.currency)}
+                </Text>
+              </View>
+            </View>
+            <DailyProfitList rows={dailyProfit} currency={org.currency} />
+          </View>
+        )}
 
         {reportsPermissionQuery.data === true && (
           <Pressable

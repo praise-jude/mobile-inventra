@@ -30,6 +30,40 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+// Mirrors tailwind.config.js's brand palette — needed as literal hex values
+// (not NativeWind classes) anywhere a component draws with react-native-svg,
+// which can't resolve CSS custom properties/className the way web's inline
+// SVG (`var(--accent)` etc.) does.
+export const ChartColors = {
+  light: {
+    border: '#e5e7eb',
+    muted: '#6b7280',
+    surface: '#ffffff',
+    text: '#111827',
+    accent: '#2563eb',
+    green: '#10b981',
+    red: '#ef4444',
+    amber: '#f59e0b',
+    sky: '#0891b2',
+  },
+  dark: {
+    border: '#232834',
+    muted: '#7f8aa0',
+    surface: '#14171f',
+    text: '#eef1f7',
+    accent: '#3b82f6',
+    green: '#34d399',
+    red: '#f87171',
+    amber: '#fbbf24',
+    sky: '#22d3ee',
+  },
+} as const;
+
+// Category/expense donut-slice palette — mirrors Inventra's
+// components/charts/DonutChart.tsx PALETTE exactly (same colors regardless
+// of light/dark, matching web's own choice there).
+export const DONUT_PALETTE = ['#2563eb', '#10b981', '#0891b2', '#f59e0b', '#ef4444', '#8a94a8'] as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
