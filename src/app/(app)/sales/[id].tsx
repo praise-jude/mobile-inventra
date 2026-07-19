@@ -250,26 +250,31 @@ function EditSaleModal({
   );
 }
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
 function receiptHtml(sale: NonNullable<ReturnType<typeof useSaleDetail>['data']>): string {
   const rows = sale.items
     .map(
       (i) =>
-        `<tr><td>${i.productName}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${formatMoney(i.lineTotal, sale.currency)}</td></tr>`,
+        `<tr><td>${escapeHtml(i.productName)}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">${formatMoney(i.lineTotal, sale.currency)}</td></tr>`,
     )
     .join('');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
     body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 24px; color: #111827; }
     h1 { font-size: 16px; text-align: center; margin: 0 0 4px; }
     .muted { color: #6b7280; font-size: 11px; text-align: center; }
+    .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #6b7280; }
     table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
     td { padding: 4px 0; border-bottom: 1px dashed #e5e7eb; }
     .totals td { border-bottom: none; }
     .total-row td { font-weight: bold; font-size: 14px; padding-top: 8px; }
   </style></head><body>
-    <h1>${sale.orgName}</h1>
-    ${sale.branchName ? `<div class="muted">${sale.branchName}</div>` : ''}
+    <h1>${escapeHtml(sale.orgName)}</h1>
+    ${sale.branchName ? `<div class="muted">${escapeHtml(sale.branchName)}</div>` : ''}
     <div class="muted">${sale.receiptNumber} · ${new Date(sale.createdAt).toLocaleString()}</div>
-    <div class="muted">${sale.customerName}</div>
+    <div class="muted">${escapeHtml(sale.customerName)}</div>
     <table>${rows}</table>
     <table class="totals">
       <tr><td>Subtotal</td><td style="text-align:right">${formatMoney(sale.subtotal, sale.currency)}</td></tr>
@@ -277,5 +282,6 @@ function receiptHtml(sale: NonNullable<ReturnType<typeof useSaleDetail>['data']>
       ${sale.taxAmount > 0 ? `<tr><td>Tax</td><td style="text-align:right">${formatMoney(sale.taxAmount, sale.currency)}</td></tr>` : ''}
       <tr class="total-row"><td>Total</td><td style="text-align:right">${formatMoney(sale.total, sale.currency)}</td></tr>
     </table>
+    ${sale.receiptFooter ? `<div class="footer">${escapeHtml(sale.receiptFooter)}</div>` : ''}
   </body></html>`;
 }

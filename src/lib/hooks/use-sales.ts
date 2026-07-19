@@ -95,6 +95,7 @@ export interface SaleDetail {
   branchName: string | null;
   branchAddress: string | null;
   cashierName: string | null;
+  receiptFooter: string | null;
 }
 
 export function useSaleDetail(id: string | null) {
@@ -110,11 +111,13 @@ export function useSaleDetail(id: string | null) {
         .single();
       if (saleError || !sale) throw new Error('Could not load this sale.');
 
-      const [{ data: items, error: itemError }, { data: payments, error: payError }, { data: org }] = await Promise.all([
-        supabase.from('stock_movements').select('id, qty_delta, unit_price, products(name)').eq('sale_id', id!),
-        supabase.from('sale_payments').select('method, amount').eq('sale_id', id!),
-        supabase.from('organizations').select('name, currency').eq('id', sale.org_id).single(),
-      ]);
+      const [{ data: items, error: itemError }, { data: payments, error: payError }, { data: org }, { data: printSettings }] =
+        await Promise.all([
+          supabase.from('stock_movements').select('id, qty_delta, unit_price, products(name)').eq('sale_id', id!),
+          supabase.from('sale_payments').select('method, amount').eq('sale_id', id!),
+          supabase.from('organizations').select('name, currency').eq('id', sale.org_id).single(),
+          supabase.from('print_settings').select('receipt_footer').eq('org_id', sale.org_id).maybeSingle(),
+        ]);
       if (itemError) throw new Error("Could not load this sale's line items.");
       if (payError) throw new Error("Could not load this sale's payments.");
 
@@ -148,6 +151,7 @@ export function useSaleDetail(id: string | null) {
         branchName: warehouse?.name ?? null,
         branchAddress: warehouse?.address ?? null,
         cashierName: cashier ? `${cashier.first_name} ${cashier.last_name}` : null,
+        receiptFooter: printSettings?.receipt_footer ?? null,
       };
     },
     enabled: !!id,

@@ -128,6 +128,24 @@ export type Customer = {
   created_at: string;
 };
 
+export type NotificationSettings = {
+  org_id: string;
+  low_stock: boolean;
+  out_of_stock: boolean;
+  expiring_products: boolean;
+  new_purchase_orders: boolean;
+  weekly_digest: boolean;
+};
+
+export type PaperSize = '58mm' | '80mm' | 'a4';
+
+export type PrintSettings = {
+  org_id: string;
+  paper_size: PaperSize;
+  auto_print: boolean;
+  receipt_footer: string | null;
+};
+
 export type Sale = {
   id: string;
   org_id: string;
@@ -290,7 +308,12 @@ export type Database = {
       organizations: TableDef<
         Organization,
         never,
-        Partial<Pick<Organization, 'name' | 'business_email' | 'country' | 'state' | 'currency' | 'timezone'>>
+        Partial<
+          Pick<
+            Organization,
+            'name' | 'business_email' | 'support_email' | 'country' | 'state' | 'currency' | 'timezone' | 'tax_rate'
+          >
+        >
       >;
       profiles: TableDef<
         Profile,
@@ -319,6 +342,8 @@ export type Database = {
       // elsewhere with a trigger) — the RLS insert policy requires it to be
       // explicitly set to auth.uid(), so it must stay in the Insert shape.
       audit_logs: TableDef<AuditLog, Omit<AuditLog, 'id' | 'created_at'> & { id?: string }, never>;
+      notification_settings: TableDef<NotificationSettings, never, Partial<Omit<NotificationSettings, 'org_id'>>>;
+      print_settings: TableDef<PrintSettings, never, Partial<Omit<PrintSettings, 'org_id'>>>;
     };
     Views: Record<string, never>;
     Functions: {
