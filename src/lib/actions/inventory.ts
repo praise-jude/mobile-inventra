@@ -53,19 +53,19 @@ export interface ProductPickerRow {
 }
 
 // Debounced type-ahead search for pickers (Sale line items, Adjustments,
-// Transfers) — mirrors searchProductsForPicker's ilike/index-backed search.
+// Transfers) — backed by the same search_products() RPC as the Inventory
+// list (see lib/hooks/use-products.ts), so a cashier's typo at the till
+// ("Wather" for "Water") gets the same typo-tolerant match instead of a
+// dead end mid-sale.
 export async function searchProductsForPicker(query: string, limit = 20): Promise<ProductPickerRow[]> {
   const q = query.trim();
   if (!q) return [];
 
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, name, sku, qty_on_hand, sell_price')
-    .is('archived_at', null)
-    .eq('is_active', true)
-    .or(`name.ilike.%${q}%,sku.ilike.%${q}%,barcode.ilike.%${q}%`)
-    .order('name', { ascending: true })
-    .limit(limit);
+  const { data, error } = await supabase.rpc('search_products', {
+    p_search: q,
+    p_active: true,
+    p_limit: limit,
+  });
   if (error) throw new Error('Could not search products.');
   return (data ?? []).map((p) => ({ id: p.id, name: p.name, sku: p.sku, qty: p.qty_on_hand, sellPrice: p.sell_price }));
 }

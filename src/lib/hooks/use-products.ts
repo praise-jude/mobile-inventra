@@ -9,37 +9,67 @@ export interface ProductsFilters {
   search?: string;
   categoryId?: string;
   warehouseId?: string;
+  supplierId?: string;
   status?: ProductStatus;
   active?: 'active' | 'inactive' | 'all';
+  minPrice?: number;
+  maxPrice?: number;
+  minMarginPct?: number;
+  maxMarginPct?: number;
+  expiryFrom?: string;
+  expiryTo?: string;
+  createdFrom?: string;
+  createdTo?: string;
 }
 
-// Mirrors Inventra/lib/queries/products.ts's getProductsPage — same
-// filters/search fields/sort, paged via useInfiniteQuery instead of a
-// page-number prop since mobile lists are scroll-to-load.
+export interface ProductSearchRow {
+  id: string;
+  sku: string;
+  barcode: string | null;
+  name: string;
+  brand: string | null;
+  emoji: string | null;
+  image_url: string | null;
+  sell_price: number;
+  qty_on_hand: number;
+  status: ProductStatus;
+  is_active: boolean;
+  warehouse_id: string | null;
+  category_name: string | null;
+}
+
+// Mirrors Inventra/lib/queries/products.ts's getProductsPage — both now
+// call the same search_products() RPC (typo-tolerant pg_trgm ranking
+// across name/sku/barcode/brand/description/supplier name, plus price/
+// margin/expiry/date-added range filters), paged via useInfiniteQuery
+// instead of a page-number prop since mobile lists are scroll-to-load.
 export function useProducts(filters: ProductsFilters) {
   return useInfiniteQuery({
     queryKey: ['products', filters],
     queryFn: async ({ pageParam }) => {
-      const from = pageParam * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
+      const offset = pageParam * PAGE_SIZE;
 
-      let query = supabase
-        .from('products')
-        .select('*', { count: 'exact' })
-        .is('archived_at', null)
-        .order('created_at', { ascending: false });
-
-      const q = filters.search?.trim();
-      if (q) query = query.or(`name.ilike.%${q}%,sku.ilike.%${q}%,barcode.ilike.%${q}%,brand.ilike.%${q}%`);
-      if (filters.categoryId) query = query.eq('category_id', filters.categoryId);
-      if (filters.warehouseId) query = query.eq('warehouse_id', filters.warehouseId);
-      if (filters.status) query = query.eq('status', filters.status);
-      if (filters.active === 'active') query = query.eq('is_active', true);
-      if (filters.active === 'inactive') query = query.eq('is_active', false);
-
-      const { data, error, count } = await query.range(from, to);
+      const { data, error } = await supabase.rpc('search_products', {
+        p_search: filters.search?.trim() || null,
+        p_category_id: filters.categoryId || null,
+        p_warehouse_id: filters.warehouseId || null,
+        p_supplier_id: filters.supplierId || null,
+        p_status: filters.status || null,
+        p_active: filters.active === 'active' ? true : filters.active === 'inactive' ? false : null,
+        p_min_price: filters.minPrice ?? null,
+        p_max_price: filters.maxPrice ?? null,
+        p_min_margin_pct: filters.minMarginPct ?? null,
+        p_max_margin_pct: filters.maxMarginPct ?? null,
+        p_expiry_from: filters.expiryFrom || null,
+        p_expiry_to: filters.expiryTo || null,
+        p_created_from: filters.createdFrom || null,
+        p_created_to: filters.createdTo || null,
+        p_limit: PAGE_SIZE,
+        p_offset: offset,
+      });
       if (error) throw new Error('Could not load products.');
-      return { rows: data ?? [], total: count ?? 0, page: pageParam };
+      const rows = (data ?? []) as (ProductSearchRow & { total_count: number })[];
+      return { rows, total: rows[0]?.total_count ?? 0, page: pageParam };
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {

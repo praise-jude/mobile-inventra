@@ -566,6 +566,42 @@ export type Database = {
         Args: Record<string, never>;
         Returns: MonthlySalesVolumeRow[];
       };
+      search_products: {
+        Args: {
+          p_search?: string | null;
+          p_category_id?: string | null;
+          p_warehouse_id?: string | null;
+          p_supplier_id?: string | null;
+          p_status?: string | null;
+          p_active?: boolean | null;
+          p_min_price?: number | null;
+          p_max_price?: number | null;
+          p_min_margin_pct?: number | null;
+          p_max_margin_pct?: number | null;
+          p_expiry_from?: string | null;
+          p_expiry_to?: string | null;
+          p_created_from?: string | null;
+          p_created_to?: string | null;
+          p_limit?: number;
+          p_offset?: number;
+        };
+        Returns: {
+          id: string;
+          sku: string;
+          barcode: string | null;
+          name: string;
+          brand: string | null;
+          emoji: string | null;
+          image_url: string | null;
+          sell_price: number;
+          qty_on_hand: number;
+          status: string;
+          is_active: boolean;
+          warehouse_id: string | null;
+          category_name: string | null;
+          total_count: number;
+        }[];
+      };
       get_sales_summary: {
         Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };
         Returns: SalesSummaryRpc;

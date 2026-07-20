@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
+import { escapeIlikeTerm } from '@/lib/postgrest-filter';
 import { supabase } from '@/lib/supabase';
 import type { PaymentMethod } from '@/types/database';
 
@@ -8,6 +9,9 @@ const PAGE_SIZE = 20;
 export interface SalesFilters {
   search?: string;
   warehouseId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface SaleListRow {
@@ -18,10 +22,13 @@ export interface SaleListRow {
   warehouseName: string | null;
 }
 
-// Mirrors Inventra/lib/queries/sales.ts's getSalesPage, simplified to a
-// single ilike over the linked customer's name (mobile's recordSale never
-// sets walk_in_name, unlike web's older data, so there's no walk-in branch
-// to match here).
+// Mirrors Inventra/lib/queries/sales.ts's getSalesPage — search is now a
+// real server-side query instead of an in-browser .filter() over whatever
+// page happened to already be loaded, which used to mean search only ever
+// found a match within the most recent PAGE_SIZE sales, never the full
+// history. Search matches the linked customer's name (mobile's recordSale
+// never sets walk_in_name, unlike web's older data, so there's no walk-in
+// branch to match here).
 export function useSales(filters: SalesFilters) {
   return useInfiniteQuery({
     queryKey: ['sales', filters],
@@ -36,12 +43,38 @@ export function useSales(filters: SalesFilters) {
         })
         .order('created_at', { ascending: false });
       if (filters.warehouseId) query = query.eq('warehouse_id', filters.warehouseId);
+      if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom);
+      if (filters.dateTo) {
+        const nextDay = new Date(filters.dateTo);
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        query = query.lt('created_at', nextDay.toISOString().slice(0, 10));
+      }
+
+      if (filters.paymentMethod) {
+        const { data: matchingPayments } = await supabase.from('sale_payments').select('sale_id').eq('method', filters.paymentMethod);
+        const saleIds = (matchingPayments ?? []).map((p) => p.sale_id);
+        if (saleIds.length === 0) return { rows: [], total: 0, page: pageParam };
+        query = query.in('id', saleIds);
+      }
+
+      const search = filters.search?.trim();
+      if (search) {
+        // No single PostgREST filter can match "walk-in name" OR "linked
+        // customer's name" in one round trip, since the latter lives on a
+        // joined table — resolve matching customer ids first, then OR
+        // both conditions together, same as web.
+        const escaped = escapeIlikeTerm(search);
+        const { data: matchingCustomers } = await supabase.from('customers').select('id').ilike('name', `%${escaped}%`);
+        const customerIds = (matchingCustomers ?? []).map((c) => c.id);
+        const orParts = [`walk_in_name.ilike."%${escaped}%"`];
+        if (customerIds.length > 0) orParts.push(`customer_id.in.(${customerIds.join(',')})`);
+        query = query.or(orParts.join(','));
+      }
 
       const { data, error, count } = await query.range(from, to);
       if (error) throw new Error('Could not load sales.');
 
-      const q = filters.search?.trim().toLowerCase();
-      let rows = (data ?? []) as unknown as {
+      const rows = (data ?? []) as unknown as {
         id: string;
         walk_in_name: string | null;
         total: number;
@@ -49,9 +82,6 @@ export function useSales(filters: SalesFilters) {
         customers: { name: string } | null;
         warehouses: { name: string } | null;
       }[];
-      if (q) {
-        rows = rows.filter((r) => (r.customers?.name ?? r.walk_in_name ?? 'walk-in customer').toLowerCase().includes(q));
-      }
 
       const mapped: SaleListRow[] = rows.map((r) => ({
         id: r.id,
