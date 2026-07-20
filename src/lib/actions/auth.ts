@@ -10,6 +10,7 @@
 //  - terms_accepted_ip is always left null for mobile-originated acceptances
 //    instead of a spoofable client-reported value.
 import { currencyForCountry, timezoneFor } from '@/lib/geo/countries';
+import { deregisterPushToken } from '@/lib/actions/notifications';
 import { supabase } from '@/lib/supabase';
 import { CURRENT_TERMS_VERSION } from '@/lib/terms';
 import type { Organization } from '@/types/database';
@@ -61,6 +62,9 @@ export async function signIn(email: string, password: string): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  // Must run before auth.signOut() tears down the session — deleting the
+  // push_tokens row needs a valid auth.uid() for RLS.
+  await deregisterPushToken();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 }

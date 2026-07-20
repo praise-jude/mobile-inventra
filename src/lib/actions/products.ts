@@ -64,7 +64,12 @@ export async function createProduct(input: CreateProductInput): Promise<string> 
   }
 
   if (input.openingQty > 0) {
-    await supabase.from('stock_movements').insert({
+    // inventory:create and inventory:create_movement are independently
+    // toggleable (role_permissions) — a role that can create products but
+    // not movements would have this insert silently RLS-filtered to 0 rows
+    // with no error, leaving qty_on_hand at 0 while the product itself
+    // reports success. Surface it instead of failing silently.
+    const { error: movementError } = await supabase.from('stock_movements').insert({
       org_id: profile.org_id,
       product_id: product.id,
       warehouse_id: input.warehouseId || null,
@@ -77,6 +82,9 @@ export async function createProduct(input: CreateProductInput): Promise<string> 
       sale_id: null,
       created_by: profile.id,
     });
+    if (movementError) {
+      throw new Error('Product was created, but opening stock could not be recorded. Add it from the product page.');
+    }
   }
 
   void logAudit({

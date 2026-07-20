@@ -119,3 +119,24 @@ export async function registerPushToken(): Promise<void> {
     console.error('[Royal Inventra] registerPushToken failed:', err);
   }
 }
+
+// Called from signOut() before the session is actually torn down (RLS
+// needs a valid auth.uid() to delete the row). Without this, a stale token
+// keeps pointing at the logged-out user until someone else logs into this
+// device and registerPushToken()'s upsert reassigns it — on a shared
+// device, any notification generated for the logged-out user in that
+// window still pushes to this device's lock screen. Deletes by exact token
+// (globally unique), not by user_id, so other devices this user is still
+// signed into are unaffected.
+export async function deregisterPushToken(): Promise<void> {
+  if (Platform.OS === 'web' || !Device.isDevice) return;
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+    const projectId = 'd6950080-af83-447e-acd1-fcd923c46a24';
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
+    await supabase.from('push_tokens').delete().eq('token', token);
+  } catch (err) {
+    console.error('[Royal Inventra] deregisterPushToken failed:', err);
+  }
+}

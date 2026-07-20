@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { signOut } from '@/lib/actions/auth';
-import { verifyRecoveryCode } from '@/lib/actions/mfa';
+import { disableMfaWithPassword } from '@/lib/actions/mfa';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
@@ -21,6 +21,7 @@ export default function MfaChallengeScreen() {
   const { refetchAal } = useAuth();
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,8 +30,20 @@ export default function MfaChallengeScreen() {
     setBusy(true);
     try {
       if (useRecoveryCode) {
-        const ok = await verifyRecoveryCode(code.trim());
-        if (!ok) throw new Error('Invalid recovery code.');
+        // Supabase's AAL system only ever elevates to aal2 via a real
+        // challenge/verify against an enrolled TOTP/phone factor — there is
+        // no way to grant an aal2 session from a recovery code alone. So a
+        // recovery code can't just "prove the second factor" for this one
+        // login; the only thing that actually gets the user back in is
+        // removing the step-up requirement entirely, i.e. disabling MFA
+        // (which requires password + code together). They can re-enroll a
+        // new authenticator from Settings once they're back in.
+        await disableMfaWithPassword({ password, code: code.trim() });
+        // The factor was deleted server-side via the Admin API, entirely
+        // outside this client's own session — the session's JWT still
+        // embeds the old aal2-required claim until refreshed, so
+        // refetchAal() below would just re-read the same stale claim.
+        await supabase.auth.refreshSession();
       } else {
         const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
         if (factorsError) throw factorsError;
@@ -63,10 +76,21 @@ export default function MfaChallengeScreen() {
       <ScrollView contentContainerClassName="flex-grow justify-center px-6 py-10" keyboardShouldPersistTaps="handled">
         <Text className="mb-1.5 text-2xl font-bold text-text dark:text-text-dark">Enter authentication code</Text>
         <Text className="mb-6 text-[14px] text-text-2 dark:text-text-2-dark">
-          {useRecoveryCode ? 'Enter one of your recovery codes.' : 'Enter the 6-digit code from your authenticator app.'}
+          {useRecoveryCode
+            ? 'Enter one of your recovery codes and your password. This will turn off two-factor authentication for your account — you can re-enable it anytime from Settings.'
+            : 'Enter the 6-digit code from your authenticator app.'}
         </Text>
 
         <View className="gap-3.5">
+          {useRecoveryCode && (
+            <TextField
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              secureTextEntry
+              autoCapitalize="none"
+            />
+          )}
           <TextField
             value={code}
             onChangeText={(v) => setCode(v.trim())}
@@ -86,6 +110,7 @@ export default function MfaChallengeScreen() {
           onPress={() => {
             setError(null);
             setCode('');
+            setPassword('');
             setUseRecoveryCode((v) => !v);
           }}
         >
