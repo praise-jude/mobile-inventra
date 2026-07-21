@@ -1,29 +1,56 @@
-import { Tabs } from 'expo-router';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
+import { useColorScheme } from 'react-native';
 
-// DIAGNOSTIC SWAP: NativeTabs (expo-router/unstable-native-tabs) replaced
-// with the stable Tabs component. Suspected cause of "app crashes
-// immediately on open": this app's environment matches a known RN 0.86
-// bridgeless-mode boot race (expo/expo#47687) almost exactly — same RN
-// version, New Architecture enabled, and the same structural trigger
-// (each tab hosts its own nested <Stack>, see inventory/_layout.tsx etc.).
-// The reporter's fix was removing the nested-Stack-under-tabs structure;
-// swapping to the stable, battle-tested Tabs component first is a much
-// smaller, fully reversible way to test whether NativeTabs itself (an
-// explicitly "unstable" API) is implicated before considering the far
-// more invasive navigation-flattening refactor. Icons are plain text
-// labels for now — @expo/vector-icons isn't installed yet, and this swap
-// is meant to isolate the crash cause, not polish the tab bar.
+import { Colors } from '@/constants/theme';
+
+// Trimmed subset of Inventra/components/app/Sidebar.tsx's NAV — Dashboard is
+// fully built (src/app/(app)/index.tsx); Sales/Inventory are honest
+// <ComingSoon /> placeholders; Billing is a real self-service screen sharing
+// components/billing-management.tsx with the blocked-subscription flow;
+// Settings currently only exposes sign-out. Icons use SF Symbols/Material
+// Symbols by name (`sf`/`md`) rather than bundled images, so there's no new
+// icon-asset pipeline to maintain.
 export default function AppTabs() {
+  const scheme = useColorScheme();
+  const colors = Colors[scheme === 'unspecified' ? 'light' : (scheme ?? 'light')];
+
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
-      <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
-      <Tabs.Screen name="sales" options={{ title: 'Sales' }} />
-      <Tabs.Screen name="inventory" options={{ title: 'Inventory' }} />
-      <Tabs.Screen name="billing" options={{ title: 'Billing' }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-      <Tabs.Screen name="reports" options={{ href: null }} />
-      <Tabs.Screen name="team" options={{ href: null }} />
-      <Tabs.Screen name="notifications" options={{ href: null }} />
-    </Tabs>
+    <NativeTabs
+      backgroundColor={colors.background}
+      indicatorColor={colors.backgroundSelected}
+      labelStyle={{ selected: { color: colors.text } }}>
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'square.grid.2x2', selected: 'square.grid.2x2.fill' }} md="dashboard" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="sales">
+        <NativeTabs.Trigger.Label>Sales</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'cart', selected: 'cart.fill' }} md="shopping_cart" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="inventory">
+        <NativeTabs.Trigger.Label>Inventory</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'shippingbox', selected: 'shippingbox.fill' }} md="inventory_2" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="billing">
+        <NativeTabs.Trigger.Label>Billing</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'creditcard', selected: 'creditcard.fill' }} md="credit_card" />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="settings">
+        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'gearshape', selected: 'gearshape.fill' }} md="settings" />
+      </NativeTabs.Trigger>
+
+      {/* Reachable via router.push (Dashboard's Reports card, Settings'
+          Team row) but not a bottom-bar destination — NativeTabs still
+          needs each top-level (app)/ route registered as a trigger or
+          navigating to it is a no-op, `hidden` just keeps it off the bar. */}
+      <NativeTabs.Trigger name="reports" hidden />
+      <NativeTabs.Trigger name="team" hidden />
+      <NativeTabs.Trigger name="notifications" hidden />
+    </NativeTabs>
   );
 }
