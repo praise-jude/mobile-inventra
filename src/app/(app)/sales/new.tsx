@@ -4,6 +4,7 @@ import { FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
+import { PendingApprovalWait } from '@/components/sales/pending-approval-wait';
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
@@ -47,6 +48,7 @@ export default function NewSaleScreen() {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
 
   const currency = useOrgCurrency();
   const taxRate = useOrgTaxRate();
@@ -116,20 +118,41 @@ export default function NewSaleScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const id = await recordSale({
+      const result = await recordSale({
         warehouseId: warehouseId || undefined,
         items: cart.map((l) => ({ productId: l.productId, qty: l.qty, discountPct: l.discountPct })),
         paymentMethod,
         notes: notes || undefined,
       });
+      if (result.status === 'pending_approval') {
+        setPendingRequestId(result.approvalRequestId);
+        return;
+      }
       haptics.success();
-      router.replace(`/sales/${id}`);
+      router.replace(`/sales/${result.saleId}`);
     } catch (err) {
       haptics.warning();
       setError(err instanceof Error ? err.message : 'Could not record the sale.');
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleApprovalApproved(saleId: string | null) {
+    setPendingRequestId(null);
+    haptics.success();
+    if (saleId) router.replace(`/sales/${saleId}`);
+    else setCart([]);
+  }
+
+  function handleApprovalRejected(reason: string | null) {
+    setPendingRequestId(null);
+    haptics.warning();
+    setError(reason ? `Discount request rejected: ${reason}` : 'Discount request was rejected.');
+  }
+
+  function handleApprovalCancelled() {
+    setPendingRequestId(null);
   }
 
   return (
@@ -275,6 +298,14 @@ export default function NewSaleScreen() {
       </ScrollView>
 
       <BarcodeScannerModal visible={scannerOpen} onClose={() => setScannerOpen(false)} onScan={handleScan} />
+      {pendingRequestId && (
+        <PendingApprovalWait
+          requestId={pendingRequestId}
+          onApproved={handleApprovalApproved}
+          onRejected={handleApprovalRejected}
+          onCancelled={handleApprovalCancelled}
+        />
+      )}
     </SafeAreaView>
   );
 }

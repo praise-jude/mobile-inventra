@@ -64,8 +64,11 @@ export default function SaleDetailScreen() {
         onPress: async () => {
           setDeleting(true);
           try {
-            await deleteSale(id!);
+            const result = await deleteSale(id!);
             haptics.success();
+            if (result.status === 'pending_approval') {
+              notifyAlert('Submitted', 'This void needs manager approval before the sale is actually removed.');
+            }
             router.back();
           } catch (err) {
             notifyAlert('Error', err instanceof Error ? err.message : 'Could not delete this sale.');

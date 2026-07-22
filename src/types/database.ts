@@ -448,6 +448,33 @@ export type RolePermissionRow = {
   updated_at: string;
 };
 
+// See Inventra/supabase/migrations/20260722100000_approval_thresholds.sql.
+export type ApprovalSettingsRow = {
+  org_id: string;
+  discount_approval_enabled: boolean;
+  discount_threshold_pct: number;
+  void_approval_enabled: boolean;
+  void_threshold_amount: number;
+  price_change_approval_enabled: boolean;
+  price_change_threshold_pct: number;
+  updated_at: string;
+};
+
+export type ApprovalRequestRow = {
+  id: string;
+  org_id: string;
+  entity_type: 'discount' | 'void_sale' | 'price_change';
+  entity_id: string | null;
+  requested_by: string;
+  requested_at: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  payload: Record<string, unknown>;
+  reason: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  rejected_reason: string | null;
+};
+
 type TableDef<Row, Insert, Update> = {
   Row: Row;
   Insert: Insert;
@@ -530,6 +557,14 @@ export type Database = {
         RolePermissionRow,
         Omit<RolePermissionRow, 'id' | 'updated_at'> & { id?: string; updated_at?: string },
         Partial<Pick<RolePermissionRow, 'allowed' | 'updated_by' | 'updated_at'>>
+      >;
+      approval_settings: TableDef<ApprovalSettingsRow, never, Partial<Omit<ApprovalSettingsRow, 'org_id'>>>;
+      approval_requests: TableDef<
+        ApprovalRequestRow,
+        Omit<ApprovalRequestRow, 'id' | 'requested_at' | 'status' | 'decided_by' | 'decided_at' | 'rejected_reason'> & {
+          id?: string;
+        },
+        Partial<Pick<ApprovalRequestRow, 'status' | 'entity_id' | 'decided_by' | 'decided_at' | 'rejected_reason'>>
       >;
     };
     Views: Record<string, never>;

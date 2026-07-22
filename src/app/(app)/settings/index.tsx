@@ -18,12 +18,16 @@ import { isAdminRole, isManagerRole } from '@/lib/roles';
 // stays Admin-tier+, mirroring Sidebar.tsx's managerOnly/adminOnly split
 // on web.
 const ALWAYS_ROWS = [{ href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' }];
-const MANAGER_ROWS = [{ href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' }];
+const MANAGER_ROWS = [
+  { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
+  { href: '/approvals/index' as const, icon: '✅', label: 'Approvals', description: 'Discounts, voids, and price changes awaiting sign-off' },
+];
 const ADMIN_ROWS = [
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
   { href: '/settings/roles' as const, icon: '🛡️', label: 'Roles', description: 'Customize what Manager, Cashier & Warehouse can do' },
   { href: '/settings/notifications' as const, icon: '🔔', label: 'Notifications', description: 'Low stock, expiring products, weekly digest' },
   { href: '/settings/printing' as const, icon: '🖨️', label: 'Receipts & Printing', description: 'Paper size, auto-print, receipt footer' },
+  { href: '/settings/approvals' as const, icon: '✅', label: 'Approvals', description: 'Require sign-off for large discounts, voids, price changes' },
 ];
 
 // Mirrors Inventra/components/settings/SettingsTabs.tsx's section nav —
@@ -36,7 +40,15 @@ export default function SettingsScreen() {
   const isManagerUp = isManagerRole(profileQuery.data?.role ?? '');
 
   function Row(row: {
-    href: '/settings/security' | '/team' | '/settings/general' | '/settings/roles' | '/settings/notifications' | '/settings/printing';
+    href:
+      | '/settings/security'
+      | '/team'
+      | '/approvals/index'
+      | '/settings/general'
+      | '/settings/roles'
+      | '/settings/notifications'
+      | '/settings/printing'
+      | '/settings/approvals';
     icon: string;
     label: string;
     description: string;

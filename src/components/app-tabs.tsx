@@ -50,6 +50,7 @@ export default function AppTabs() {
           navigating to it is a no-op, `hidden` just keeps it off the bar. */}
       <NativeTabs.Trigger name="reports" hidden />
       <NativeTabs.Trigger name="team" hidden />
+      <NativeTabs.Trigger name="approvals" hidden />
       <NativeTabs.Trigger name="notifications" hidden />
     </NativeTabs>
   );

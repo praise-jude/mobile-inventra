@@ -5,9 +5,11 @@
 // Paystack calls), so there's no need for a bearer-token API route the way
 // billing has one — RLS is the real enforcement boundary either way.
 import { logAudit } from '@/lib/actions/audit';
+import { createApprovalRequest, getApprovalSettings } from '@/lib/approval-service';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
+import type { UserRole } from '@/types/database';
 
 export interface CreateProductInput {
   name: string;
@@ -120,22 +122,25 @@ export interface UpdateProductInput {
   imageUrl?: string;
 }
 
-export async function updateProduct(id: string, input: UpdateProductInput): Promise<void> {
-  const profile = await requireProfile();
-  await requirePermission('inventory', 'edit');
+// % change relative to the current value; a move away from a currently-zero
+// price is always treated as needing approval when enabled.
+function pctChange(before: number, after: number): number {
+  if (before === after) return 0;
+  if (before === 0) return Infinity;
+  return (Math.abs(after - before) / before) * 100;
+}
+
+// The actual write — shared by the immediate path (updateProduct, no
+// approval needed) and the approved-request path (approvals.ts). A price
+// change over threshold holds the entire edit for approval, not just price.
+export async function performUpdateProduct(
+  ctx: { orgId: string; userId: string; role: UserRole; actorName: string },
+  id: string,
+  input: UpdateProductInput,
+): Promise<void> {
+  const { orgId, userId, role, actorName } = ctx;
   const name = input.name.trim();
   const sku = input.sku.trim();
-  if (!name) throw new Error('Product name is required.');
-  if (!sku) throw new Error('SKU is required.');
-
-  const { data: clash } = await supabase
-    .from('products')
-    .select('id')
-    .eq('org_id', profile.org_id)
-    .eq('sku', sku)
-    .neq('id', id)
-    .maybeSingle();
-  if (clash) throw new Error('Another product already uses this SKU.');
 
   const { data: updated, error } = await supabase
     .from('products')
@@ -156,7 +161,7 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
       image_url: input.imageUrl || null,
     })
     .eq('id', id)
-    .eq('org_id', profile.org_id)
+    .eq('org_id', orgId)
     .select('id')
     .maybeSingle();
   if (error) {
@@ -171,10 +176,10 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
   }
 
   void logAudit({
-    orgId: profile.org_id,
-    actorId: profile.id,
-    actorName: `${profile.first_name} ${profile.last_name}`,
-    actorRole: profile.role,
+    orgId,
+    actorId: userId,
+    actorName,
+    actorRole: role,
     action: 'product.updated',
     module: 'Products',
     entityType: 'product',
@@ -182,6 +187,56 @@ export async function updateProduct(id: string, input: UpdateProductInput): Prom
     entityLabel: name,
     newValue: { name, sku, costPrice: input.costPrice, sellPrice: input.sellPrice },
   });
+}
+
+export type UpdateProductResult = { status: 'updated' } | { status: 'pending_approval'; approvalRequestId: string };
+
+export async function updateProduct(id: string, input: UpdateProductInput): Promise<UpdateProductResult> {
+  const profile = await requireProfile();
+  await requirePermission('inventory', 'edit');
+  const name = input.name.trim();
+  const sku = input.sku.trim();
+  if (!name) throw new Error('Product name is required.');
+  if (!sku) throw new Error('SKU is required.');
+
+  const { data: clash } = await supabase
+    .from('products')
+    .select('id')
+    .eq('org_id', profile.org_id)
+    .eq('sku', sku)
+    .neq('id', id)
+    .maybeSingle();
+  if (clash) throw new Error('Another product already uses this SKU.');
+
+  const { data: current } = await supabase.from('products').select('name, cost_price, sell_price').eq('id', id).maybeSingle();
+
+  const settings = await getApprovalSettings(profile.org_id);
+  const priceChangePct = current
+    ? Math.max(pctChange(Number(current.cost_price), input.costPrice), pctChange(Number(current.sell_price), input.sellPrice))
+    : 0;
+  const needsApproval =
+    !!settings?.price_change_approval_enabled &&
+    priceChangePct > Number(settings.price_change_threshold_pct) &&
+    profile.role !== 'owner' &&
+    profile.role !== 'admin';
+
+  const ctx = { orgId: profile.org_id, userId: profile.id, role: profile.role, actorName: `${profile.first_name} ${profile.last_name}` };
+
+  if (needsApproval) {
+    const requestId = await createApprovalRequest({
+      orgId: profile.org_id,
+      entityType: 'price_change',
+      entityId: id,
+      requestedBy: profile.id,
+      payload: { productId: id, input, before: current },
+      notifyTitle: 'Price change needs approval',
+      notifyBody: `${ctx.actorName} wants to change prices on "${current?.name ?? name}" (${priceChangePct === Infinity ? '>100' : priceChangePct.toFixed(0)}% change).`,
+    });
+    return { status: 'pending_approval', approvalRequestId: requestId };
+  }
+
+  await performUpdateProduct(ctx, id, input);
+  return { status: 'updated' };
 }
 
 export async function setProductActive(id: string, isActive: boolean): Promise<void> {

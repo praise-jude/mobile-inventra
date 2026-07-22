@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProductForm } from '@/components/product-form';
 import { Button } from '@/components/ui/button';
 import { updateProduct } from '@/lib/actions/products';
+import { notifyAlert } from '@/lib/confirm';
 import { haptics } from '@/lib/haptics';
 import { useOrgId } from '@/lib/hooks/use-org';
 import { useProduct } from '@/lib/hooks/use-products';
@@ -18,7 +19,7 @@ export default function EditProductScreen() {
   const queryClient = useQueryClient();
 
   async function handleSubmit(values: ProductFormInput, imageUrl: string | undefined) {
-    await updateProduct(id!, {
+    const result = await updateProduct(id!, {
       name: values.name,
       description: values.description,
       sku: values.sku,
@@ -33,6 +34,12 @@ export default function EditProductScreen() {
       warehouseId: values.warehouseId,
       imageUrl: imageUrl ?? productQuery.data?.image_url ?? undefined,
     });
+    if (result.status === 'pending_approval') {
+      haptics.success();
+      notifyAlert('Submitted', 'This price change needs manager approval before it takes effect.');
+      router.back();
+      return;
+    }
     haptics.success();
     queryClient.invalidateQueries({ queryKey: ['product', id] });
     queryClient.invalidateQueries({ queryKey: ['products'] });

@@ -83,6 +83,41 @@ async function sendPushNotification(userId: string, title: string, body?: string
   }
 }
 
+// Fans out a notification to every manager/admin/owner in the org except
+// the actor who triggered it — mirrors Inventra/lib/notifications-service.ts's
+// notifyApprovers. createNotification has no broadcast concept (single
+// recipient by design), so this just calls it once per approver.
+export async function notifyApprovers(input: {
+  orgId: string;
+  excludeUserId: string;
+  type: string;
+  title: string;
+  body?: string;
+  entityType?: string;
+  entityId?: string;
+}): Promise<void> {
+  const { data: approvers } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('org_id', input.orgId)
+    .in('role', ['owner', 'admin', 'manager'])
+    .neq('id', input.excludeUserId);
+
+  await Promise.all(
+    (approvers ?? []).map((a) =>
+      createNotification({
+        orgId: input.orgId,
+        userId: a.id,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        entityType: input.entityType,
+        entityId: input.entityId,
+      }),
+    ),
+  );
+}
+
 // Called once per session (see (app)/_layout.tsx) after a user is
 // authenticated. Web has no meaningful equivalent (would need VAPID keys
 // for browser push, a separate setup) so this is native-only; simulators

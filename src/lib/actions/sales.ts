@@ -3,10 +3,11 @@
 // direct client write rather than a bearer-token API route — the one
 // meaningful difference from web is documented below on recordSale.
 import { logAudit } from '@/lib/actions/audit';
+import { createApprovalRequest, getApprovalSettings } from '@/lib/approval-service';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
-import type { PaymentMethod, Profile } from '@/types/database';
+import type { PaymentMethod, Profile, UserRole } from '@/types/database';
 
 function requireSalesRole(profile: Profile) {
   if (profile.role === 'warehouse') throw new Error("Warehouse accounts can't record sales.");
@@ -26,20 +27,16 @@ export interface RecordSaleInput {
   notes?: string;
 }
 
-// Re-derives every money figure from freshly-fetched product prices/stock
-// right before insert — same "never trust client totals" rule web's
-// recordSale documents, just run on-device instead of in a Next.js Server
-// Action. The one gap vs. web: there's no second, independent server-side
-// re-check after this — a race between two staff selling the last unit at
-// the same moment could both pass this check. Accepted for v1, matching how
-// every other mobile write already relies on this client-side-check +
-// RLS-scoping pattern (see products.ts/inventory.ts); revisit only if
-// overselling actually shows up in practice.
-export async function recordSale(input: RecordSaleInput): Promise<string> {
-  const profile = await requireProfile();
-  requireSalesRole(profile);
-  await requirePermission('sales', 'create');
+interface ComputedSale {
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  total: number;
+  maxDiscountPct: number;
+  lines: { productId: string; qty: number; warehouseId: string | null; unitPrice: number }[];
+}
 
+async function computeSale(orgId: string, input: RecordSaleInput): Promise<ComputedSale> {
   if (input.items.length === 0) throw new Error('Add at least one product to the sale.');
   for (const item of input.items) {
     if (item.qty <= 0) throw new Error('Quantity must be greater than zero.');
@@ -49,7 +46,7 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
   const productIds = input.items.map((i) => i.productId);
   const [{ data: products, error: prodError }, { data: org, error: orgError }] = await Promise.all([
     supabase.from('products').select('id, name, sell_price, qty_on_hand, warehouse_id, is_active').in('id', productIds),
-    supabase.from('organizations').select('tax_rate').eq('id', profile.org_id).single(),
+    supabase.from('organizations').select('tax_rate').eq('id', orgId).single(),
   ]);
   if (prodError || !products) throw new Error('Could not load the selected products.');
   if (orgError || !org) throw new Error('Could not load tax settings.');
@@ -58,7 +55,8 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
 
   let subtotal = 0;
   let discountAmount = 0;
-  const lines: { productId: string; qty: number; warehouseId: string | null; unitPrice: number }[] = [];
+  let maxDiscountPct = 0;
+  const lines: ComputedSale['lines'] = [];
 
   for (const item of input.items) {
     const product = productById.get(item.productId);
@@ -67,6 +65,7 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
     if (item.qty > product.qty_on_hand) {
       throw new Error(`Only ${product.qty_on_hand} of "${product.name}" in stock.`);
     }
+    maxDiscountPct = Math.max(maxDiscountPct, item.discountPct);
     const lineSubtotal = Number(product.sell_price) * item.qty;
     const lineDiscount = lineSubtotal * (item.discountPct / 100);
     const lineTotal = lineSubtotal - lineDiscount;
@@ -85,10 +84,24 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
   const total = taxableAmount + taxAmount;
   if (total <= 0) throw new Error('Sale total must be greater than zero.');
 
+  return { subtotal, discountAmount, taxAmount, total, maxDiscountPct, lines };
+}
+
+// The actual writes — shared by the immediate path (recordSale, no approval
+// needed) and the approved-request path (approvals.ts, run attributed to the
+// original requester once a manager approves it).
+export async function performRecordSale(
+  ctx: { orgId: string; userId: string; role: UserRole; actorName: string },
+  input: RecordSaleInput,
+  computed: ComputedSale,
+): Promise<string> {
+  const { orgId, userId, role, actorName } = ctx;
+  const { subtotal, discountAmount, taxAmount, total, lines } = computed;
+
   const { data: sale, error: saleError } = await supabase
     .from('sales')
     .insert({
-      org_id: profile.org_id,
+      org_id: orgId,
       customer_id: input.customerId || null,
       walk_in_name: null,
       warehouse_id: input.warehouseId || null,
@@ -97,7 +110,7 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
       tax_amount: taxAmount,
       total,
       notes: input.notes?.trim() || null,
-      created_by: profile.id,
+      created_by: userId,
     })
     .select('id')
     .single();
@@ -105,12 +118,12 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
 
   const { error: payError } = await supabase
     .from('sale_payments')
-    .insert({ org_id: profile.org_id, sale_id: sale.id, method: input.paymentMethod, amount: total });
+    .insert({ org_id: orgId, sale_id: sale.id, method: input.paymentMethod, amount: total });
   if (payError) throw new Error("Could not record the sale's payment.");
 
   const { error: movementError } = await supabase.from('stock_movements').insert(
     lines.map((l) => ({
-      org_id: profile.org_id,
+      org_id: orgId,
       product_id: l.productId,
       warehouse_id: l.warehouseId,
       type: 'sale' as const,
@@ -120,16 +133,16 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
       adjustment_type: null,
       notes: null,
       sale_id: sale.id,
-      created_by: profile.id,
+      created_by: userId,
     })),
   );
   if (movementError) throw new Error('Could not update stock for this sale.');
 
   void logAudit({
-    orgId: profile.org_id,
-    actorId: profile.id,
-    actorName: `${profile.first_name} ${profile.last_name}`,
-    actorRole: profile.role,
+    orgId,
+    actorId: userId,
+    actorName,
+    actorRole: role,
     action: 'sale.created',
     module: 'Sales',
     entityType: 'sale',
@@ -139,6 +152,39 @@ export async function recordSale(input: RecordSaleInput): Promise<string> {
   });
 
   return sale.id as string;
+}
+
+export type RecordSaleResult =
+  | { status: 'created'; saleId: string }
+  | { status: 'pending_approval'; approvalRequestId: string };
+
+export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResult> {
+  const profile = await requireProfile();
+  requireSalesRole(profile);
+  await requirePermission('sales', 'create');
+
+  const computed = await computeSale(profile.org_id, input);
+
+  const settings = await getApprovalSettings(profile.org_id);
+  const needsApproval =
+    !!settings?.discount_approval_enabled && computed.maxDiscountPct > Number(settings.discount_threshold_pct);
+
+  const ctx = { orgId: profile.org_id, userId: profile.id, role: profile.role, actorName: `${profile.first_name} ${profile.last_name}` };
+
+  if (needsApproval) {
+    const requestId = await createApprovalRequest({
+      orgId: profile.org_id,
+      entityType: 'discount',
+      requestedBy: profile.id,
+      payload: { input, computed },
+      notifyTitle: 'Discount needs approval',
+      notifyBody: `${ctx.actorName} wants to apply a ${computed.maxDiscountPct}% discount on a sale of ${computed.total.toFixed(2)}.`,
+    });
+    return { status: 'pending_approval', approvalRequestId: requestId };
+  }
+
+  const saleId = await performRecordSale(ctx, input, computed);
+  return { status: 'created', saleId };
 }
 
 export interface UpdateSaleInput {
@@ -184,10 +230,47 @@ export async function updateSale(id: string, input: UpdateSaleInput): Promise<vo
   });
 }
 
-// Deleting each stock_movements row fires the DB's reverse_stock_movement
-// trigger, restoring qty_on_hand — no manual compensating entry needed. The
-// sales row delete then cascades to sale_payments.
-export async function deleteSale(id: string): Promise<void> {
+// The actual void — shared by the immediate path (deleteSale, no approval
+// needed) and the approved-request path (approvals.ts).
+export async function performDeleteSale(
+  ctx: { orgId: string; userId: string; role: UserRole; actorName: string },
+  sale: { id: string; total: number },
+): Promise<void> {
+  const { orgId, userId, role, actorName } = ctx;
+
+  // A DELETE that RLS silently filters to 0 rows returns no error at all —
+  // if this role has sales:delete but not inventory:delete_movement
+  // (independently configurable via role_permissions), the movements would
+  // never get removed, but without this check the sale row would still be
+  // deleted right after, permanently desyncing the stock ledger.
+  const { count: movementCount } = await supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('sale_id', sale.id);
+  if ((movementCount ?? 0) > 0) {
+    const { data: deletedMovements, error: movementsError } = await supabase.from('stock_movements').delete().eq('sale_id', sale.id).select('id');
+    if (movementsError) throw new Error("Could not reverse this sale's stock impact.");
+    if (!deletedMovements || deletedMovements.length === 0) {
+      throw new Error("Could not reverse this sale's stock impact — you may be missing the permission needed to delete stock movements.");
+    }
+  }
+
+  const { error: deleteError } = await supabase.from('sales').delete().eq('id', sale.id);
+  if (deleteError) throw new Error('Could not delete the sale.');
+
+  void logAudit({
+    orgId,
+    actorId: userId,
+    actorName,
+    actorRole: role,
+    action: 'sale.voided',
+    module: 'Sales',
+    entityType: 'sale',
+    entityId: sale.id,
+    newValue: { total: sale.total },
+  });
+}
+
+export type DeleteSaleResult = { status: 'deleted' } | { status: 'pending_approval'; approvalRequestId: string };
+
+export async function deleteSale(id: string, reason?: string): Promise<DeleteSaleResult> {
   const profile = await requireProfile();
   await requirePermission('sales', 'delete');
 
@@ -195,32 +278,29 @@ export async function deleteSale(id: string): Promise<void> {
   if (saleError) throw new Error('Could not load this sale.');
   if (!sale) throw new Error('Sale not found.');
 
-  // A DELETE that RLS silently filters to 0 rows returns no error at all —
-  // if this role has sales:delete but not inventory:delete_movement
-  // (independently configurable via role_permissions), the movements would
-  // never get removed, but without this check the sale row would still be
-  // deleted right after, permanently desyncing the stock ledger.
-  const { count: movementCount } = await supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('sale_id', id);
-  if ((movementCount ?? 0) > 0) {
-    const { data: deletedMovements, error: movementsError } = await supabase.from('stock_movements').delete().eq('sale_id', id).select('id');
-    if (movementsError) throw new Error("Could not reverse this sale's stock impact.");
-    if (!deletedMovements || deletedMovements.length === 0) {
-      throw new Error("Could not reverse this sale's stock impact — you may be missing the permission needed to delete stock movements.");
-    }
+  const settings = await getApprovalSettings(profile.org_id);
+  const needsApproval =
+    !!settings?.void_approval_enabled &&
+    Number(sale.total) > Number(settings.void_threshold_amount) &&
+    profile.role !== 'owner' &&
+    profile.role !== 'admin';
+
+  const ctx = { orgId: profile.org_id, userId: profile.id, role: profile.role, actorName: `${profile.first_name} ${profile.last_name}` };
+
+  if (needsApproval) {
+    const requestId = await createApprovalRequest({
+      orgId: profile.org_id,
+      entityType: 'void_sale',
+      entityId: id,
+      requestedBy: profile.id,
+      payload: { saleId: id, total: sale.total },
+      reason,
+      notifyTitle: 'Void needs approval',
+      notifyBody: `${ctx.actorName} wants to void a sale worth ${Number(sale.total).toFixed(2)}.`,
+    });
+    return { status: 'pending_approval', approvalRequestId: requestId };
   }
 
-  const { error: deleteError } = await supabase.from('sales').delete().eq('id', id);
-  if (deleteError) throw new Error('Could not delete the sale.');
-
-  void logAudit({
-    orgId: profile.org_id,
-    actorId: profile.id,
-    actorName: `${profile.first_name} ${profile.last_name}`,
-    actorRole: profile.role,
-    action: 'sale.voided',
-    module: 'Sales',
-    entityType: 'sale',
-    entityId: id,
-    newValue: { total: sale.total },
-  });
+  await performDeleteSale(ctx, sale as { id: string; total: number });
+  return { status: 'deleted' };
 }
