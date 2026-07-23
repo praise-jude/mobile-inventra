@@ -24,7 +24,7 @@ module.exports = {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
-      package: "com.judeewah.royalinventra",
+      package: "com.judeewahsteam.royalinventra",
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     },
     web: {
@@ -64,6 +64,11 @@ module.exports = {
         },
       ],
       "expo-notifications",
+      // Pins the Google Services Gradle plugin to a specific version — see
+      // plugins/withGoogleServicesVersion.js for why this needs a custom
+      // plugin (neither Expo's own google-services injection nor
+      // expo-build-properties expose an app.config.js option for it).
+      [require("./plugins/withGoogleServicesVersion"), "4.5.0"],
     ],
     experiments: {
       typedRoutes: true,
