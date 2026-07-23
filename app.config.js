@@ -24,7 +24,7 @@ module.exports = {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
-      package: "com.judeewahsteam.royalinventra",
+      package: "com.judeewah.royalinventra",
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     },
     web: {
