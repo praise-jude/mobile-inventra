@@ -63,6 +63,7 @@ export const signupSchema = z
     country: z.string().min(1, 'Country is required.'),
     state: z.string().optional(),
     role: z.enum(['admin', 'manager', 'staff']),
+    referralCode: z.string().optional(),
     termsAccepted: z.boolean().refine((v) => v, {
       message: 'You must accept the Terms & Conditions and Privacy Policy.',
     }),

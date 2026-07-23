@@ -45,6 +45,7 @@ export async function registerAccount(input: SignupInput): Promise<RegisterAccou
         currency,
         timezone,
         role: input.role,
+        referral_code: input.referralCode?.trim() || undefined,
         terms_accepted: true,
         terms_version: CURRENT_TERMS_VERSION,
         terms_accepted_ip: null,

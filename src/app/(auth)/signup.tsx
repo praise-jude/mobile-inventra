@@ -41,6 +41,7 @@ export default function SignupScreen() {
       country: '',
       state: '',
       role: 'admin',
+      referralCode: '',
       termsAccepted: false,
     },
   });
@@ -269,6 +270,21 @@ export default function SignupScreen() {
               setup.
             </Text>
           </View>
+
+          <Controller
+            control={control}
+            name="referralCode"
+            render={({ field }) => (
+              <TextField
+                label="Referral code (optional)"
+                autoCapitalize="characters"
+                placeholder="e.g. ABCD1234"
+                value={field.value ?? ''}
+                onChangeText={(v) => field.onChange(v.toUpperCase())}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
 
           <Controller
             control={control}

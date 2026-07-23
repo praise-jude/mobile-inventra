@@ -1,3 +1,5 @@
+import { useQuery } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -10,6 +12,7 @@ import { updateGeneralSettings } from '@/lib/actions/settings';
 import { COUNTRIES, CURRENCY_CODES, IANA_TIMEZONES, statesForCountry, timezoneFor } from '@/lib/geo/countries';
 import { haptics } from '@/lib/haptics';
 import { useOrgSettings } from '@/lib/hooks/use-settings';
+import { supabase } from '@/lib/supabase';
 import type { Organization } from '@/types/database';
 
 const COUNTRY_OPTIONS = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
@@ -46,6 +49,27 @@ function GeneralForm({ org, onInvalidate }: { org: Organization; onInvalidate: (
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<'code' | 'link' | null>(null);
+
+  const referredQuery = useQuery({
+    queryKey: ['referred-orgs', org.id],
+    queryFn: async () => {
+      const { data, error: fetchError } = await supabase
+        .from('organizations')
+        .select('id, name, created_at')
+        .eq('referred_by_org_id', org.id)
+        .order('created_at', { ascending: false });
+      if (fetchError) throw fetchError;
+      return data ?? [];
+    },
+  });
+
+  async function copyReferral(text: string, which: 'code' | 'link') {
+    await Clipboard.setStringAsync(text);
+    haptics.success();
+    setCopied(which);
+    setTimeout(() => setCopied(null), 2000);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -124,6 +148,61 @@ function GeneralForm({ org, onInvalidate }: { org: Organization; onInvalidate: (
         <Button loading={saving} onPress={handleSave} className="mt-2">
           Save changes
         </Button>
+
+        <View className="mt-2 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+          <Text className="mb-1 text-[14px] font-bold text-text dark:text-text-dark">Referral code</Text>
+          <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">
+            Share your code or link — businesses that sign up with it are linked to your organization here.
+          </Text>
+
+          <Text className="mb-1.5 text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Your code</Text>
+          <View className="mb-3.5 flex-row items-center gap-2">
+            <View className="flex-1 rounded-[9px] border border-border bg-bg px-[13px] py-[11px] dark:border-border-dark dark:bg-bg-dark">
+              <Text className="font-mono text-[14px] tracking-wider text-text dark:text-text-dark">{org.referral_code}</Text>
+            </View>
+            <Pressable
+              onPress={() => copyReferral(org.referral_code, 'code')}
+              className="rounded-[9px] border border-border px-3.5 py-[11px] dark:border-border-dark"
+            >
+              <Text className="text-[13px] font-semibold text-text dark:text-text-dark">{copied === 'code' ? 'Copied ✓' : 'Copy'}</Text>
+            </Pressable>
+          </View>
+
+          {process.env.EXPO_PUBLIC_API_URL && (
+            <>
+              <Text className="mb-1.5 text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Shareable link</Text>
+              <View className="mb-3.5 flex-row items-center gap-2">
+                <View className="flex-1 rounded-[9px] border border-border bg-bg px-[13px] py-[11px] dark:border-border-dark dark:bg-bg-dark">
+                  <Text numberOfLines={1} className="text-[12px] text-text-2 dark:text-text-2-dark">
+                    {process.env.EXPO_PUBLIC_API_URL}/signup?ref={org.referral_code}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => copyReferral(`${process.env.EXPO_PUBLIC_API_URL}/signup?ref=${org.referral_code}`, 'link')}
+                  className="rounded-[9px] border border-border px-3.5 py-[11px] dark:border-border-dark"
+                >
+                  <Text className="text-[13px] font-semibold text-text dark:text-text-dark">{copied === 'link' ? 'Copied ✓' : 'Copy'}</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+
+          <Text className="mb-2 text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">
+            Businesses referred by you{referredQuery.data && referredQuery.data.length > 0 ? ` (${referredQuery.data.length})` : ''}
+          </Text>
+          {!referredQuery.data || referredQuery.data.length === 0 ? (
+            <Text className="text-[12.5px] text-muted dark:text-muted-dark">No signups with your code yet.</Text>
+          ) : (
+            <View className="gap-1.5">
+              {referredQuery.data.map((r) => (
+                <View key={r.id} className="flex-row items-center justify-between">
+                  <Text className="text-[13px] text-text dark:text-text-dark">{r.name}</Text>
+                  <Text className="text-[12px] text-muted dark:text-muted-dark">{new Date(r.created_at).toLocaleDateString()}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
