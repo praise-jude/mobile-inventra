@@ -6,7 +6,7 @@
 // for `expo start`/local builds where the real file sits at the repo root.
 module.exports = {
   expo: {
-    name: "royal-inventra",
+    name: "Royal Inventra",
     slug: "royal-inventra",
     version: "1.0.0",
     orientation: "portrait",
@@ -24,7 +24,7 @@ module.exports = {
         monochromeImage: "./assets/images/android-icon-monochrome.png",
       },
       predictiveBackGestureEnabled: false,
-      package: "com.judeewahsteam.royalinventra",
+      package: "com.judeewah.royalinventra",
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? "./google-services.json",
     },
     web: {
