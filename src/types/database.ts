@@ -617,10 +617,14 @@ export type Database = {
       customers: TableDef<Customer, Omit<Customer, 'id' | 'created_at'> & { id?: string }, never>;
       debtors: TableDef<
         Debtor,
-        Omit<Debtor, 'id' | 'created_at' | 'updated_at' | 'status'> & { id?: string; status?: DebtorStatus },
+        Omit<Debtor, 'id' | 'created_at' | 'updated_at' | 'status' | 'created_by'> & { id?: string; status?: DebtorStatus; created_by?: string | null },
         Partial<Pick<Debtor, 'customer_name' | 'phone' | 'email' | 'notes' | 'amount_owed' | 'due_date' | 'status'>>
       >;
-      debtor_payments: TableDef<DebtorPayment, Omit<DebtorPayment, 'id'> & { id?: string }, never>;
+      debtor_payments: TableDef<
+        DebtorPayment,
+        Omit<DebtorPayment, 'id' | 'paid_at' | 'created_by'> & { id?: string; paid_at?: string; created_by?: string | null },
+        never
+      >;
       expenses: TableDef<Expense, Omit<Expense, 'id' | 'created_at'> & { id?: string }, Partial<Omit<Expense, 'id' | 'org_id' | 'created_at'>>>;
       stock_movements: TableDef<StockMovement, Omit<StockMovement, 'id' | 'created_at'> & { id?: string }, never>;
       sales: TableDef<Sale, Omit<Sale, 'id' | 'created_at'> & { id?: string }, Partial<Pick<Sale, 'notes'>>>;
@@ -697,6 +701,10 @@ export type Database = {
       get_warehouse_stock_summary: {
         Args: Record<string, never>;
         Returns: { warehouse_id: string; sku_count: number; stock_value: number; total_units: number }[];
+      };
+      get_debtor_payments_total: {
+        Args: Record<string, never>;
+        Returns: number;
       };
       search_products: {
         Args: {

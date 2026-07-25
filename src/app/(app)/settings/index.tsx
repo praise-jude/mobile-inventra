@@ -18,7 +18,10 @@ import { isAdminRole, isManagerRole } from '@/lib/roles';
 // stays Admin-tier+, mirroring Sidebar.tsx's managerOnly/adminOnly split
 // on web.
 const ALWAYS_ROWS = [{ href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' }];
-const MANAGER_ROWS = [{ href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' }];
+const MANAGER_ROWS = [
+  { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
+  { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
+];
 const ADMIN_ROWS = [
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
   { href: '/settings/roles' as const, icon: '🛡️', label: 'Roles', description: 'Customize what Manager, Cashier & Warehouse can do' },
@@ -40,6 +43,7 @@ export default function SettingsScreen() {
     href:
       | '/settings/security'
       | '/team'
+      | '/customers'
       | '/settings/general'
       | '/settings/roles'
       | '/settings/notifications'
