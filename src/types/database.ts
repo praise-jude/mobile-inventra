@@ -115,18 +115,79 @@ export type Category = {
   emoji: string | null;
 };
 
+// Contact fields added by
+// Inventra/supabase/migrations/20260708120400_categories_suppliers.sql.
 export type Supplier = {
   id: string;
   org_id: string;
   name: string;
+  company: string | null;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
   created_at: string;
 };
 
+export type WarehouseStatus = 'active' | 'inactive';
+
+// country/state/phone/status added by
+// Inventra/supabase/migrations/20260708210200_branches_extend_schema.sql —
+// table stays named `warehouses` in Postgres, UI label is "Branches".
 export type Warehouse = {
   id: string;
   org_id: string;
   name: string;
   address: string | null;
+  manager_profile_id: string | null;
+  capacity: number | null;
+  country: string | null;
+  state: string | null;
+  phone: string | null;
+  status: WarehouseStatus;
+  created_at: string;
+};
+
+export type DebtorStatus = 'pending' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled';
+
+// See Inventra/supabase/migrations/20260708120500_debtors_expenses.sql.
+// amount_owed is maintained by the apply_debtor_payment() trigger whenever a
+// debtor_payments row is inserted — never write it directly except at
+// creation time.
+export type Debtor = {
+  id: string;
+  org_id: string;
+  customer_name: string;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  amount_owed: number;
+  due_date: string | null;
+  status: DebtorStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DebtorPayment = {
+  id: string;
+  org_id: string;
+  debtor_id: string;
+  amount: number;
+  paid_at: string;
+  note: string | null;
+  created_by: string | null;
+};
+
+export type Expense = {
+  id: string;
+  org_id: string;
+  category: ExpenseCategory;
+  description: string | null;
+  amount: number;
+  incurred_at: string;
+  created_by: string | null;
+  created_at: string;
 };
 
 export type Customer = {
@@ -535,10 +596,32 @@ export type Database = {
         Omit<Product, 'id' | 'status' | 'created_at' | 'updated_at'> & { id?: string },
         Partial<Omit<Product, 'id' | 'org_id' | 'status' | 'created_at' | 'updated_at'>>
       >;
-      categories: TableDef<Category, Omit<Category, 'id'> & { id?: string }, never>;
-      suppliers: TableDef<Supplier, Omit<Supplier, 'id' | 'created_at'> & { id?: string }, never>;
-      warehouses: TableDef<Warehouse, never, never>;
+      categories: TableDef<Category, Omit<Category, 'id'> & { id?: string }, Partial<Omit<Category, 'id' | 'org_id'>>>;
+      suppliers: TableDef<
+        Supplier,
+        Omit<Supplier, 'id' | 'created_at' | 'company' | 'contact_person' | 'email' | 'phone' | 'address'> & {
+          id?: string;
+          company?: string | null;
+          contact_person?: string | null;
+          email?: string | null;
+          phone?: string | null;
+          address?: string | null;
+        },
+        Partial<Omit<Supplier, 'id' | 'org_id' | 'created_at'>>
+      >;
+      warehouses: TableDef<
+        Warehouse,
+        Omit<Warehouse, 'id' | 'created_at' | 'status'> & { id?: string; status?: WarehouseStatus },
+        Partial<Omit<Warehouse, 'id' | 'org_id' | 'created_at'>>
+      >;
       customers: TableDef<Customer, Omit<Customer, 'id' | 'created_at'> & { id?: string }, never>;
+      debtors: TableDef<
+        Debtor,
+        Omit<Debtor, 'id' | 'created_at' | 'updated_at' | 'status'> & { id?: string; status?: DebtorStatus },
+        Partial<Pick<Debtor, 'customer_name' | 'phone' | 'email' | 'notes' | 'amount_owed' | 'due_date' | 'status'>>
+      >;
+      debtor_payments: TableDef<DebtorPayment, Omit<DebtorPayment, 'id'> & { id?: string }, never>;
+      expenses: TableDef<Expense, Omit<Expense, 'id' | 'created_at'> & { id?: string }, Partial<Omit<Expense, 'id' | 'org_id' | 'created_at'>>>;
       stock_movements: TableDef<StockMovement, Omit<StockMovement, 'id' | 'created_at'> & { id?: string }, never>;
       sales: TableDef<Sale, Omit<Sale, 'id' | 'created_at'> & { id?: string }, Partial<Pick<Sale, 'notes'>>>;
       sale_payments: TableDef<SalePayment, Omit<SalePayment, 'id'> & { id?: string }, Partial<Pick<SalePayment, 'method'>>>;
@@ -602,6 +685,18 @@ export type Database = {
       get_monthly_sales_volume: {
         Args: Record<string, never>;
         Returns: MonthlySalesVolumeRow[];
+      };
+      get_category_product_counts: {
+        Args: Record<string, never>;
+        Returns: { category_id: string; count: number }[];
+      };
+      get_supplier_product_counts: {
+        Args: Record<string, never>;
+        Returns: { supplier_id: string; count: number }[];
+      };
+      get_warehouse_stock_summary: {
+        Args: Record<string, never>;
+        Returns: { warehouse_id: string; sku_count: number; stock_value: number; total_units: number }[];
       };
       search_products: {
         Args: {

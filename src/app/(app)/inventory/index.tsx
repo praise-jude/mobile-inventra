@@ -270,6 +270,20 @@ export default function InventoryScreen() {
             <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Movements</Text>
           </Pressable>
         </View>
+        <View className="mt-2 flex-row gap-2">
+          <Pressable
+            onPress={() => router.push('/inventory/categories')}
+            className="flex-1 items-center justify-center rounded-[9px] border border-border bg-surface py-2 dark:border-border-dark dark:bg-surface-dark"
+          >
+            <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Categories</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/inventory/suppliers')}
+            className="flex-1 items-center justify-center rounded-[9px] border border-border bg-surface py-2 dark:border-border-dark dark:bg-surface-dark"
+          >
+            <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Suppliers</Text>
+          </Pressable>
+        </View>
       </View>
 
       {query.isLoading ? (
