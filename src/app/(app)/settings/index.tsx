@@ -21,6 +21,7 @@ const ALWAYS_ROWS = [{ href: '/settings/security' as const, icon: '🔐', label:
 const MANAGER_ROWS = [
   { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
   { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
+  { href: '/expenses' as const, icon: '💸', label: 'Expenses', description: 'Log rent, salary, transport and other spend' },
 ];
 const ADMIN_ROWS = [
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
@@ -44,6 +45,7 @@ export default function SettingsScreen() {
       | '/settings/security'
       | '/team'
       | '/customers'
+      | '/expenses'
       | '/settings/general'
       | '/settings/roles'
       | '/settings/notifications'

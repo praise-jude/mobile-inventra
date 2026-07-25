@@ -625,7 +625,11 @@ export type Database = {
         Omit<DebtorPayment, 'id' | 'paid_at' | 'created_by'> & { id?: string; paid_at?: string; created_by?: string | null },
         never
       >;
-      expenses: TableDef<Expense, Omit<Expense, 'id' | 'created_at'> & { id?: string }, Partial<Omit<Expense, 'id' | 'org_id' | 'created_at'>>>;
+      expenses: TableDef<
+        Expense,
+        Omit<Expense, 'id' | 'created_at' | 'created_by'> & { id?: string; created_by?: string | null },
+        Partial<Omit<Expense, 'id' | 'org_id' | 'created_at' | 'created_by'>>
+      >;
       stock_movements: TableDef<StockMovement, Omit<StockMovement, 'id' | 'created_at'> & { id?: string }, never>;
       sales: TableDef<Sale, Omit<Sale, 'id' | 'created_at'> & { id?: string }, Partial<Pick<Sale, 'notes'>>>;
       sale_payments: TableDef<SalePayment, Omit<SalePayment, 'id'> & { id?: string }, Partial<Pick<SalePayment, 'method'>>>;
