@@ -14,3 +14,8 @@ export function escapeIlikeTerm(raw: string): string {
     .replace(/_/g, '\\_')
     .replace(/"/g, '\\"');
 }
+
+export function orIlike(columns: string[], term: string): string {
+  const escaped = escapeIlikeTerm(term);
+  return columns.map((col) => `${col}.ilike."%${escaped}%"`).join(',');
+}

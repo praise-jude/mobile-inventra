@@ -452,6 +452,7 @@ export type AuditLog = {
   entity_type: string | null;
   entity_id: string | null;
   entity_label: string | null;
+  previous_value: Record<string, unknown> | null;
   new_value: Record<string, unknown> | null;
   created_at: string;
 };
@@ -636,7 +637,11 @@ export type Database = {
       // actor_id has no DB default (unlike created_by-style columns
       // elsewhere with a trigger) — the RLS insert policy requires it to be
       // explicitly set to auth.uid(), so it must stay in the Insert shape.
-      audit_logs: TableDef<AuditLog, Omit<AuditLog, 'id' | 'created_at'> & { id?: string }, never>;
+      audit_logs: TableDef<
+        AuditLog,
+        Omit<AuditLog, 'id' | 'created_at' | 'previous_value'> & { id?: string; previous_value?: Record<string, unknown> | null },
+        never
+      >;
       notification_settings: TableDef<NotificationSettings, never, Partial<Omit<NotificationSettings, 'org_id'>>>;
       print_settings: TableDef<PrintSettings, never, Partial<Omit<PrintSettings, 'org_id'>>>;
       mfa_recovery_codes: TableDef<MfaRecoveryCode, never, never>;

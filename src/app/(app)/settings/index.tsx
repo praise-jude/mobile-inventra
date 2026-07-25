@@ -29,6 +29,7 @@ const ADMIN_ROWS = [
   { href: '/settings/notifications' as const, icon: '🔔', label: 'Notifications', description: 'Low stock, expiring products, weekly digest' },
   { href: '/settings/printing' as const, icon: '🖨️', label: 'Receipts & Printing', description: 'Paper size, auto-print, receipt footer' },
   { href: '/settings/approvals' as const, icon: '✅', label: 'Approvals', description: 'Require sign-off for large discounts, voids, price changes' },
+  { href: '/audit-log' as const, icon: '🛡️', label: 'Audit Log', description: 'Who changed what, and when' },
 ];
 
 // Mirrors Inventra/components/settings/SettingsTabs.tsx's section nav —
@@ -50,7 +51,8 @@ export default function SettingsScreen() {
       | '/settings/roles'
       | '/settings/notifications'
       | '/settings/printing'
-      | '/settings/approvals';
+      | '/settings/approvals'
+      | '/audit-log';
     icon: string;
     label: string;
     description: string;
