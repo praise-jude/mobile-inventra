@@ -283,6 +283,12 @@ export default function InventoryScreen() {
           >
             <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Suppliers</Text>
           </Pressable>
+          <Pressable
+            onPress={() => router.push('/inventory/warehouses')}
+            className="flex-1 items-center justify-center rounded-[9px] border border-border bg-surface py-2 dark:border-border-dark dark:bg-surface-dark"
+          >
+            <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">Branches</Text>
+          </Pressable>
         </View>
       </View>
 
