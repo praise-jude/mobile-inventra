@@ -9,6 +9,8 @@
 //    Supabase service-role key, which mobile can never hold.
 //  - terms_accepted_ip is always left null for mobile-originated acceptances
 //    instead of a spoofable client-reported value.
+import * as Linking from 'expo-linking';
+
 import { currencyForCountry, timezoneFor } from '@/lib/geo/countries';
 import { deregisterPushToken } from '@/lib/actions/notifications';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +37,12 @@ export async function registerAccount(input: SignupInput): Promise<RegisterAccou
     email,
     password: input.password,
     options: {
+      // Confirmation email must return to the app, not the web app's
+      // default Site URL — Linking.createURL resolves to
+      // royalinventra://callback in a standalone/dev-client build and to
+      // the correct exp://<lan-ip>/--/callback form under Expo Go, so this
+      // works in both development and production without branching.
+      emailRedirectTo: Linking.createURL('callback'),
       data: {
         first_name: firstName,
         last_name: lastName,

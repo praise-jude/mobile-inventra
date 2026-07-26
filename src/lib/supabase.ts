@@ -78,6 +78,12 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // PKCE (not the default implicit flow) so email-link redirects
+    // (signup confirmation, magic link) carry a `?code=` query param
+    // instead of a `#access_token=` fragment — src/app/(auth)/callback.tsx
+    // exchanges it via exchangeCodeForSession(). The code verifier is
+    // stored automatically in the `storage` adapter above.
+    flowType: 'pkce',
   },
 });
 
