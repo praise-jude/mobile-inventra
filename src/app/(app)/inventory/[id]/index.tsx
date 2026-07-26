@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BarcodePreview } from '@/components/barcode-preview';
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
@@ -216,6 +217,22 @@ export default function ProductDetailScreen() {
             <Text className="text-[12.5px] leading-relaxed text-text-2 dark:text-text-2-dark">{product.description}</Text>
           </View>
         )}
+
+        <View className="mt-4 items-center rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+          <Text className="mb-3 self-start text-[11px] font-semibold text-text-2 dark:text-text-2-dark">Barcode</Text>
+          {!isPremium ? (
+            <Pressable onPress={openUpgradeModal} className="items-center gap-1 py-2">
+              <View className="rounded-full bg-accent-weak px-2.5 py-1 dark:bg-accent-weak-dark">
+                <Text className="text-[10.5px] font-bold text-accent-text dark:text-accent-text-dark">PREMIUM</Text>
+              </View>
+              <Text className="text-[12px] text-muted dark:text-muted-dark">Upgrade to generate a barcode</Text>
+            </Pressable>
+          ) : product.barcode || product.sku ? (
+            <BarcodePreview value={product.barcode || product.sku} />
+          ) : (
+            <Text className="text-[12.5px] text-muted dark:text-muted-dark">No barcode set</Text>
+          )}
+        </View>
 
         {isManager && (
           <View className="mt-5 gap-2.5">

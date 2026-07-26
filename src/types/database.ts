@@ -208,6 +208,22 @@ export type NotificationSettings = {
   weekly_digest: boolean;
 };
 
+// Platform-wide singleton config table, not org-scoped — mirrors
+// Inventra/lib/queries/support-settings.ts's SupportSettings. Read via a
+// plain authenticated-read RLS policy (support_settings_select_authenticated)
+// rather than a service-role client the way web's root layout does it —
+// mobile has no secure way to ship a service-role key in the app bundle.
+export type SupportSettings = {
+  id: string;
+  whatsapp_number: string;
+  whatsapp_message: string;
+  business_hours: string;
+  support_email: string;
+  average_response: string;
+  whatsapp_enabled: boolean;
+  widget_enabled: boolean;
+};
+
 export type PaperSize = '58mm' | '80mm' | 'a4';
 
 export type PrintSettings = {
@@ -647,6 +663,8 @@ export type Database = {
       // a direct table update, so `Update` is `never` here.
       subscriptions: TableDef<Subscription, never, never>;
       invoices: TableDef<Invoice, never, never>;
+      // Read-only — see support_settings_select_authenticated RLS policy.
+      support_settings: TableDef<SupportSettings, never, never>;
 
       products: TableDef<
         Product,

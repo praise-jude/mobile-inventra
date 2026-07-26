@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { View } from 'react-native';
 
 import AppTabs from '@/components/app-tabs';
+import { SupportWidget } from '@/components/support-widget';
 import { registerPushToken } from '@/lib/actions/notifications';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { PresenceProvider } from '@/lib/presence-context';
@@ -25,7 +27,10 @@ export default function AppLayout() {
 
   return (
     <PresenceProvider userId={profile.id} orgId={profile.org_id} name={`${profile.first_name} ${profile.last_name}`} role={profile.role}>
-      <AppTabs />
+      <View style={{ flex: 1 }}>
+        <AppTabs />
+        <SupportWidget />
+      </View>
     </PresenceProvider>
   );
 }

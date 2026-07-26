@@ -17,7 +17,10 @@ import { isAdminRole, isManagerRole } from '@/lib/roles';
 // Team screen itself) — everything else here is business config and
 // stays Admin-tier+, mirroring Sidebar.tsx's managerOnly/adminOnly split
 // on web.
-const ALWAYS_ROWS = [{ href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' }];
+const ALWAYS_ROWS = [
+  { href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' },
+  { href: '/support' as const, icon: '💬', label: 'Contact support', description: 'Email or WhatsApp us directly' },
+];
 // Invoices matches Sidebar.tsx's `hideForWarehouse` scope on web (every
 // role except Warehouse can create one) — broader than the manager-tier+
 // rows below, so it gets its own bucket rather than joining MANAGER_ROWS.
@@ -50,6 +53,7 @@ export default function SettingsScreen() {
   function Row(row: {
     href:
       | '/settings/security'
+      | '/support'
       | '/invoices'
       | '/team'
       | '/customers'

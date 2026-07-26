@@ -1,12 +1,17 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { router } from 'expo-router';
+import Papa from 'papaparse';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { SelectField } from '@/components/ui/select-field';
+import { importProductsCsv, type ImportProductRow } from '@/lib/actions/products';
+import { notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
@@ -45,9 +50,11 @@ const STATUS_FILTERS: { key: ProductStatus | 'all'; label: string }[] = [
 // with Adjustments/Movements as quick links rather than separate tabs
 // (Inventra/components/inventory/InventoryTabs.tsx's sub-nav, flattened).
 export default function InventoryScreen() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [categoryId, setCategoryId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [supplierId, setSupplierId] = useState('');
@@ -100,20 +107,62 @@ export default function InventoryScreen() {
     setMaxMargin('');
   }
 
+  // Mirrors Inventra/components/products/ProductsClient.tsx's handleImportFile
+  // — the actual create/update-by-SKU logic lives in importProductsCsv
+  // (lib/actions/products.ts), shared 1:1 with the web action's rules.
+  async function handleImportCsv() {
+    const picked = await DocumentPicker.getDocumentAsync({
+      type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+      copyToCacheDirectory: true,
+    });
+    if (picked.canceled || !picked.assets?.[0]) return;
+
+    setImporting(true);
+    try {
+      const response = await fetch(picked.assets[0].uri);
+      const text = await response.text();
+      const parsed = Papa.parse<ImportProductRow>(text, { header: true, skipEmptyLines: true });
+      const result = await importProductsCsv(parsed.data);
+      haptics.success();
+      notifyAlert(
+        'Import complete',
+        `${result.created} created, ${result.updated} updated${result.failed ? `, ${result.failed} failed` : ''}`,
+      );
+      if (result.errors.length > 0) console.error('[Royal Inventra] CSV import errors:', result.errors);
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    } catch (err) {
+      haptics.warning();
+      notifyAlert('Error', err instanceof Error ? err.message : 'Could not import that CSV file.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
       <View className="px-5 pb-3 pt-2">
         <View className="flex-row items-center justify-between">
           <Text className="text-[22px] font-bold tracking-tight text-text dark:text-text-dark">Inventory</Text>
-          <Pressable
-            onPress={() => {
-              haptics.tap();
-              router.push('/inventory/new');
-            }}
-            className="h-9 w-9 items-center justify-center rounded-full bg-accent dark:bg-accent-dark"
-          >
-            <Text className="text-[20px] font-bold text-white">+</Text>
-          </Pressable>
+          <View className="flex-row items-center gap-2">
+            <Pressable
+              onPress={handleImportCsv}
+              disabled={importing}
+              className="h-9 items-center justify-center rounded-full border border-border bg-surface px-3 dark:border-border-dark dark:bg-surface-dark"
+            >
+              <Text className="text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">
+                {importing ? 'Importing…' : '⤒ Import CSV'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                haptics.tap();
+                router.push('/inventory/new');
+              }}
+              className="h-9 w-9 items-center justify-center rounded-full bg-accent dark:bg-accent-dark"
+            >
+              <Text className="text-[20px] font-bold text-white">+</Text>
+            </Pressable>
+          </View>
         </View>
 
         <TextInput
