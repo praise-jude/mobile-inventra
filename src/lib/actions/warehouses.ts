@@ -1,6 +1,6 @@
 // Direct-Supabase equivalent of Inventra/lib/actions/warehouses.ts.
 import { logAudit } from '@/lib/actions/audit';
-import { canManageBranches, UpgradeRequiredError } from '@/lib/entitlements';
+import { canManageBranches, canTransferProduct, UpgradeRequiredError } from '@/lib/entitlements';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -128,6 +128,7 @@ export async function deleteWarehouse(id: string): Promise<void> {
 
 export async function transferWarehouseStock(productId: string, toWarehouseId: string, reason?: string): Promise<void> {
   const profile = await requireManagerProfile();
+  if (!(await canTransferProduct())) throw new UpgradeRequiredError('Transferring stock between branches requires a Premium subscription.');
 
   const { data: product, error: productError } = await supabase
     .from('products')

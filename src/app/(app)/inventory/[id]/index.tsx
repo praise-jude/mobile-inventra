@@ -11,10 +11,12 @@ import { createAdjustment, transferWarehouseStock } from '@/lib/actions/inventor
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useProduct, useWarehouses } from '@/lib/hooks/use-products';
 import { isManagerRole } from '@/lib/roles';
+import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 import { useQueryClient } from '@tanstack/react-query';
 import type { AdjustmentType } from '@/types/database';
 
@@ -37,6 +39,9 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const productQuery = useProduct(id ?? null);
   const profileQuery = useMyProfile();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
+  const { openUpgradeModal } = useUpgradeModal();
   const currency = useOrgCurrency();
   const queryClient = useQueryClient();
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -138,8 +143,15 @@ export default function ProductDetailScreen() {
           <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Back</Text>
         </Pressable>
         {isManager && (
-          <Pressable onPress={() => router.push(`/inventory/${product.id}/edit`)} hitSlop={10}>
-            <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Edit</Text>
+          <Pressable onPress={() => (isPremium ? router.push(`/inventory/${product.id}/edit`) : openUpgradeModal())} hitSlop={10}>
+            <View className="flex-row items-center gap-1.5">
+              <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Edit</Text>
+              {!isPremium && (
+                <View className="rounded-full bg-accent-weak px-1.5 py-px dark:bg-accent-weak-dark">
+                  <Text className="text-[9.5px] font-bold text-accent-text dark:text-accent-text-dark">PRO</Text>
+                </View>
+              )}
+            </View>
           </Pressable>
         )}
       </View>
@@ -210,17 +222,17 @@ export default function ProductDetailScreen() {
             <Button variant="secondary" onPress={() => setAdjustOpen(true)}>
               Adjust stock
             </Button>
-            <Button variant="secondary" onPress={() => setTransferOpen(true)}>
-              Transfer to another warehouse
+            <Button variant="secondary" onPress={() => (isPremium ? setTransferOpen(true) : openUpgradeModal())}>
+              Transfer to another warehouse{!isPremium ? ' (PRO)' : ''}
             </Button>
             <Button variant="secondary" loading={busy} onPress={handleToggleActive}>
               {product.is_active ? 'Mark inactive' : 'Mark active'}
             </Button>
-            <Button variant="ghost" loading={busy} onPress={handleArchive}>
-              Archive
+            <Button variant="ghost" loading={busy} onPress={() => (isPremium ? handleArchive() : openUpgradeModal())}>
+              Archive{!isPremium ? ' (PRO)' : ''}
             </Button>
-            <Pressable onPress={handleDelete} className="items-center py-2">
-              <Text className="text-[13px] font-semibold text-red dark:text-red-dark">Delete product</Text>
+            <Pressable onPress={() => (isPremium ? handleDelete() : openUpgradeModal())} className="items-center py-2">
+              <Text className="text-[13px] font-semibold text-red dark:text-red-dark">Delete product{!isPremium ? ' (PRO)' : ''}</Text>
             </Pressable>
           </View>
         )}

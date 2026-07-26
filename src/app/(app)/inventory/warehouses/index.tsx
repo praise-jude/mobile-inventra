@@ -7,10 +7,12 @@ import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/format';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 import { useWarehousesOverview } from '@/lib/hooks/use-warehouses';
 import { isAdminRole } from '@/lib/roles';
+import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 
 // Mirrors Inventra/components/inventory/WarehousesClient.tsx — table stays
 // named `warehouses` in the DB, UI label is "Branches" per
@@ -20,6 +22,9 @@ export default function WarehousesScreen() {
   const currency = useOrgCurrency();
   const query = useWarehousesOverview();
   const canManage = isAdminRole(profileQuery.data?.role ?? '');
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
+  const { openUpgradeModal } = useUpgradeModal();
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -33,8 +38,8 @@ export default function WarehousesScreen() {
 
       {canManage && (
         <View className="p-4 pb-0">
-          <Button onPress={() => router.push('/inventory/warehouses/new')} className="self-start px-4">
-            + New branch
+          <Button onPress={() => (isPremium ? router.push('/inventory/warehouses/new') : openUpgradeModal())} className="self-start px-4">
+            + New branch{!isPremium ? ' (PRO)' : ''}
           </Button>
         </View>
       )}

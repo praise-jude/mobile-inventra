@@ -11,9 +11,11 @@ import { REJECT_REASONS, approveMember, reactivateMember, rejectMember, removeMe
 import { useAuth } from '@/lib/auth-context';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { haptics } from '@/lib/haptics';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useTeamMembers, type TeamMemberRow } from '@/lib/hooks/use-team';
 import { isAdminRole } from '@/lib/roles';
+import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 
 // Mirrors Inventra/components/team/TeamClient.tsx — a bottom-sheet Modal
 // stands in for the web dropdown menu, and Alert.alert stands in for
@@ -59,6 +61,9 @@ export default function TeamScreen() {
   const currentUserId = session?.user.id;
   const profileQuery = useMyProfile();
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
+  const { openUpgradeModal } = useUpgradeModal();
   const query = useTeamMembers();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
@@ -111,11 +116,18 @@ export default function TeamScreen() {
         <Pressable
           onPress={() => {
             haptics.tap();
-            router.push('/team/invite');
+            if (isPremium) router.push('/team/invite');
+            else openUpgradeModal();
           }}
           hitSlop={10}
+          className="flex-row items-center gap-1"
         >
           <Text className="text-[20px] font-semibold text-accent-text dark:text-accent-text-dark">+</Text>
+          {!isPremium && (
+            <View className="rounded-full bg-accent-weak px-1.5 py-px dark:bg-accent-weak-dark">
+              <Text className="text-[9.5px] font-bold text-accent-text dark:text-accent-text-dark">PRO</Text>
+            </View>
+          )}
         </Pressable>
       </View>
 
