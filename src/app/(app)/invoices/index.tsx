@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { useInvoicesOverview, type InvoiceRow } from '@/lib/hooks/use-invoices';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
@@ -82,6 +83,7 @@ export default function InvoicesScreen() {
             <FlatList
               data={filtered}
               keyExtractor={(i) => i.id}
+              {...FLATLIST_PERF_PROPS}
               contentContainerClassName="gap-2 px-4 pb-6"
               renderItem={({ item }) => (
                 <Pressable

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 import { useStockMovements } from '@/lib/hooks/use-inventory';
 import { timeAgo } from '@/lib/format';
@@ -40,6 +41,7 @@ export default function AdjustmentsScreen() {
         <FlatList
           data={rows}
           keyExtractor={(item) => item.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="p-5"
           refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           onEndReached={() => {

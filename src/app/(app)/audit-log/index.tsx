@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/error-state';
 import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { SelectField } from '@/components/ui/select-field';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { useAuditLogs, useAuditModules, type AuditLogRow } from '@/lib/hooks/use-audit-log';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
@@ -91,6 +92,7 @@ export default function AuditLogScreen() {
         <FlatList
           data={rows}
           keyExtractor={(r) => r.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="gap-2 px-4 pb-6"
           onEndReached={() => {
             if (query.hasNextPage) void query.fetchNextPage();

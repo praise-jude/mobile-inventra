@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useSuppliersDetailed } from '@/lib/hooks/use-suppliers';
 import { isManagerRole } from '@/lib/roles';
@@ -64,6 +65,7 @@ export default function SuppliersScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(s) => s.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="gap-2 px-4 pb-6"
           renderItem={({ item }) => (
             <Pressable

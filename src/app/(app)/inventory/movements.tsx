@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { timeAgo } from '@/lib/format';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useStockMovements } from '@/lib/hooks/use-inventory';
@@ -43,6 +44,7 @@ export default function MovementsScreen() {
         <FlatList
           data={rows}
           keyExtractor={(item) => item.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="p-5"
           refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           onEndReached={() => {

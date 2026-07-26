@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
+
 export interface SelectOption {
   label: string;
   value: string;
@@ -71,6 +73,7 @@ export function SelectField({ label, error, value, placeholder, options, onChang
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.value}
+            {...FLATLIST_PERF_PROPS}
             className="mt-2"
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (

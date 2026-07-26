@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { Skeleton } from '@/components/skeleton';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useInventoryValuation } from '@/lib/hooks/use-reports';
@@ -47,6 +48,7 @@ export default function InventoryValuationScreen() {
         <FlatList
           data={query.data ?? []}
           keyExtractor={(item) => item.productId}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="p-5"
           ListHeaderComponent={
             (query.data?.length ?? 0) > 0 ? (

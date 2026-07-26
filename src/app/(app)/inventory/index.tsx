@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/skeleton';
 import { SelectField } from '@/components/ui/select-field';
 import { importProductsCsv, type ImportProductRow } from '@/lib/actions/products';
 import { notifyAlert } from '@/lib/confirm';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
@@ -353,6 +354,7 @@ export default function InventoryScreen() {
         <FlatList
           data={products}
           keyExtractor={(item) => item.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="px-5 pb-10"
           refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           onEndReached={() => {

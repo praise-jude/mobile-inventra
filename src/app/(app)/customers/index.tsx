@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/error-state';
 import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { useDebtorsOverview, type DebtorRow } from '@/lib/hooks/use-debtors';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
@@ -91,6 +92,7 @@ export default function CustomersScreen() {
             <FlatList
               data={filtered}
               keyExtractor={(d) => d.id}
+              {...FLATLIST_PERF_PROPS}
               contentContainerClassName="gap-2 px-4 pb-6"
               renderItem={({ item }) => (
                 <Pressable

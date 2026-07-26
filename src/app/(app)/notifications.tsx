@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { markAllNotificationsRead, markNotificationRead } from '@/lib/actions/notifications';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { haptics } from '@/lib/haptics';
 import { useNotifications } from '@/lib/hooks/use-notifications';
 import type { NotificationRow } from '@/types/database';
@@ -73,6 +74,7 @@ export default function NotificationsScreen() {
         <FlatList
           data={notifications}
           keyExtractor={(n) => n.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="p-4"
           ListEmptyComponent={
             <EmptyState icon="🔔" title="No notifications yet" description="Approvals, rejections, and team activity will show up here." />

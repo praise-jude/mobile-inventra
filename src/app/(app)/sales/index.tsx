@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
@@ -104,6 +105,7 @@ export default function SalesScreen() {
         <FlatList
           data={sales}
           keyExtractor={(item) => item.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="px-5 pb-10"
           refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           onEndReached={() => {

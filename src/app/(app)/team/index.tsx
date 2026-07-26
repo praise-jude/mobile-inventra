@@ -10,6 +10,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { REJECT_REASONS, approveMember, reactivateMember, rejectMember, removeMember, resendInvite, suspendMember, updateMemberRole } from '@/lib/actions/team';
 import { useAuth } from '@/lib/auth-context';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { haptics } from '@/lib/haptics';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
@@ -176,6 +177,7 @@ export default function TeamScreen() {
           <FlatList
             data={filtered}
             keyExtractor={(m) => m.id}
+            {...FLATLIST_PERF_PROPS}
             contentContainerClassName="gap-2.5 p-4 pb-10"
             ListEmptyComponent={<EmptyState icon="👥" title="No members found" description="Try a different search or filter." />}
             renderItem={({ item: m }) => {

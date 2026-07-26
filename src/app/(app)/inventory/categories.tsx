@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
 import { createCategory, deleteCategory, updateCategory } from '@/lib/actions/categories';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
+import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { haptics } from '@/lib/haptics';
 import { useCategoriesDetailed, type CategoryDetailRow } from '@/lib/hooks/use-categories';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
@@ -102,6 +103,7 @@ export default function CategoriesScreen() {
         <FlatList
           data={filtered}
           keyExtractor={(c) => c.id}
+          {...FLATLIST_PERF_PROPS}
           contentContainerClassName="gap-2 px-4 pb-6"
           renderItem={({ item }) => (
             <View className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
