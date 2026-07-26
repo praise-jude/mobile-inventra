@@ -1,19 +1,14 @@
 import { Stack } from 'expo-router';
 
-import { useAuth } from '@/lib/auth-context';
-
+// Phase F retired the mandatory card/trial step (src/lib/auth-context.tsx
+// no longer has awaitingCard) — RootNavigator only ever enters this group
+// for needsOnboarding (terms/country incomplete), so there's just one
+// screen left. `plan.tsx` is no longer routed to from here; it's dead
+// until Phase F7 decides whether the "Upgrade to Premium" flow reuses it.
 export default function OnboardingLayout() {
-  const { needsOnboarding, awaitingCard } = useAuth();
-
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={needsOnboarding}>
-        <Stack.Screen name="complete" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={!needsOnboarding && awaitingCard}>
-        <Stack.Screen name="plan" />
-      </Stack.Protected>
+      <Stack.Screen name="complete" />
     </Stack>
   );
 }

@@ -26,28 +26,23 @@ interface AuthContextValue {
   // Inventra/lib/supabase/middleware.ts: no profile yet, terms not
   // accepted, or (once both of those pass) no country on the org.
   needsOnboarding: boolean;
-  // Mirrors middleware's awaitingCard: a fresh trial with no card on file
-  // yet (trial_ends_at is only set once the Paystack webhook confirms
-  // tokenization). Only meaningful once needsOnboarding is false — the
-  // subscription/billing gate is a separate, later tier from profile
-  // onboarding.
-  awaitingCard: boolean;
   // Mirrors web's app/pending-approval/page.tsx redirect: a Manager-invited
   // member who's accepted their invite but hasn't been approved yet (see
   // guard_profile_status_transitions() — an Admin-invited member skips this
   // and lands straight in 'active'). Only meaningful once needsOnboarding
-  // and awaitingCard are both false.
+  // is false.
   awaitingApproval: boolean;
-  // Mirrors middleware's BLOCKED_STATUSES + trialExpired check: a returning
-  // user whose trial ran out or whose subscription lapsed (past_due,
-  // payment_failed, cancelled, expired, suspended). Only meaningful once
-  // needsOnboarding, awaitingCard, and awaitingApproval are all false.
-  blocked: boolean;
   refetchGate: () => void;
   refetchAal: () => void;
 }
 
-const BLOCKED_STATUSES = ['past_due', 'payment_failed', 'cancelled', 'expired', 'suspended'];
+// Phase F retired the mandatory card/trial/subscription-block gate that
+// used to live here (awaitingCard, blocked, BLOCKED_STATUSES) — every org
+// now has full app access on the Free plan the moment onboarding is
+// complete, and Premium (src/lib/entitlements.ts) is a pure opt-in upgrade
+// with no forced redirect. A lapsed Premium subscription falls back to
+// Free limits, it doesn't lock anyone out — see
+// Inventra/supabase/migrations/20260726091940_freemium_premium_plans.sql.
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -112,15 +107,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       needsOnboarding = !gate.country;
     }
   }
-  const awaitingCard = gate?.subscription_status === 'trialing' && !gate.trial_ends_at;
-  const awaitingApproval = !!session && !needsMfaStepUp && !needsOnboarding && !awaitingCard && gate?.member_status === 'awaiting_approval';
-
-  let blocked = false;
-  if (session && !needsMfaStepUp && !needsOnboarding && !awaitingCard && !awaitingApproval) {
-    const trialExpired =
-      gate?.subscription_status === 'trialing' && !!gate.trial_ends_at && new Date(gate.trial_ends_at) < new Date();
-    blocked = trialExpired || (!!gate?.subscription_status && BLOCKED_STATUSES.includes(gate.subscription_status));
-  }
+  const awaitingApproval = !!session && !needsMfaStepUp && !needsOnboarding && gate?.member_status === 'awaiting_approval';
 
   return (
     <AuthContext.Provider
@@ -132,9 +119,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         aalLoading: aalQuery.isLoading,
         needsMfaStepUp,
         needsOnboarding,
-        awaitingCard,
         awaitingApproval,
-        blocked,
         refetchGate: () => void gateQuery.refetch(),
         refetchAal: () => void aalQuery.refetch(),
       }}

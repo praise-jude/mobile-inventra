@@ -43,23 +43,23 @@ export default function RootLayout() {
 // before every other authed gate, same top priority middleware.ts gives it
 // server-side, since password auth alone already sets a valid session and
 // nothing else here should be reachable until that's resolved; session but
-// profile/terms/country incomplete, or profile complete but no card on file
-// yet (awaitingCard) -> (onboarding) (which itself picks the right screen,
-// see (onboarding)/_layout.tsx); onboarded but a Manager-invited member not
-// yet approved -> (pending-approval); onboarded+approved but the
-// trial/subscription has lapsed (blocked) -> (billing); otherwise -> (app).
-// Renders nothing while intro/session/gate state is still resolving so we
-// don't flash the wrong group before redirecting.
+// profile/terms/country incomplete -> (onboarding); onboarded but a
+// Manager-invited member not yet approved -> (pending-approval); otherwise
+// -> (app). Phase F retired the old subscription/billing hard-block tier
+// here — every org has full app access on the Free plan the moment
+// onboarding is complete; a lapsed Premium subscription falls back to Free
+// limits inside (app), it no longer locks anyone out at the navigator
+// level (see src/lib/auth-context.tsx). (billing) still exists as a
+// manually-reachable screen (Settings > Subscription), just not a forced
+// destination. Renders nothing while intro/session/gate state is still
+// resolving so we don't flash the wrong group before redirecting.
 function RootNavigator() {
-  const { session, initializing, gateLoading, aalLoading, needsMfaStepUp, needsOnboarding, awaitingCard, awaitingApproval, blocked } =
-    useAuth();
+  const { session, initializing, gateLoading, aalLoading, needsMfaStepUp, needsOnboarding, awaitingApproval } = useAuth();
   const { seen: introSeen } = useIntroSeen();
 
   if (introSeen === null || initializing) return null;
   const authed = !!session;
   if (authed && (gateLoading || aalLoading)) return null;
-
-  const needsOnboardingFlow = needsOnboarding || awaitingCard;
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -75,19 +75,15 @@ function RootNavigator() {
         <Stack.Screen name="(mfa-challenge)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={authed && !needsMfaStepUp && needsOnboardingFlow}>
+      <Stack.Protected guard={authed && !needsMfaStepUp && needsOnboarding}>
         <Stack.Screen name="(onboarding)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboardingFlow && awaitingApproval}>
+      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboarding && awaitingApproval}>
         <Stack.Screen name="(pending-approval)" />
       </Stack.Protected>
 
-      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboardingFlow && !awaitingApproval && blocked}>
-        <Stack.Screen name="(billing)" />
-      </Stack.Protected>
-
-      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboardingFlow && !awaitingApproval && !blocked}>
+      <Stack.Protected guard={authed && !needsMfaStepUp && !needsOnboarding && !awaitingApproval}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
     </Stack>
