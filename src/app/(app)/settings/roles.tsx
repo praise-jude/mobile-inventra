@@ -5,9 +5,11 @@ import { ActivityIndicator, Pressable, ScrollView, Switch, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState } from '@/components/error-state';
+import { PremiumLockedState } from '@/components/premium-locked-state';
 import { resetRolePermission, updateRolePermission } from '@/lib/actions/roles';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import {
   ACTION_LABELS,
   CUSTOMIZABLE_ROLES,
@@ -32,6 +34,8 @@ const ROLE_LABELS: Record<CustomizableRole, string> = {
 export default function RolesSettingsScreen() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
 
   const query = useQuery({
     queryKey: ['role-permissions', session?.user.id],
@@ -101,7 +105,9 @@ export default function RolesSettingsScreen() {
         <View className="w-14" />
       </View>
 
-      {query.isLoading ? (
+      {entitlementsQuery.data && !isPremium ? (
+        <PremiumLockedState feature="Customizing staff roles" />
+      ) : query.isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator />
         </View>

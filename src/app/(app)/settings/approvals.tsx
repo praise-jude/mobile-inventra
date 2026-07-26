@@ -6,9 +6,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TextField } from '@/components/ui/text-field';
 import { Button } from '@/components/ui/button';
+import { PremiumLockedState } from '@/components/premium-locked-state';
 import { updateApprovalSettings, type ApprovalSettingsInput } from '@/lib/actions/settings';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { supabase } from '@/lib/supabase';
 import type { ApprovalSettingsRow } from '@/types/database';
 
@@ -17,6 +19,7 @@ import type { ApprovalSettingsRow } from '@/types/database';
 export default function ApprovalSettingsScreen() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const entitlementsQuery = useEntitlements();
 
   const query = useQuery({
     queryKey: ['approval-settings', session?.user.id],
@@ -34,6 +37,14 @@ export default function ApprovalSettingsScreen() {
     },
     enabled: !!session,
   });
+
+  if (entitlementsQuery.data && entitlementsQuery.data.tier !== 'premium') {
+    return (
+      <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
+        <PremiumLockedState feature="Approval workflows" />
+      </SafeAreaView>
+    );
+  }
 
   if (query.isLoading || !query.data) {
     return (

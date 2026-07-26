@@ -12,9 +12,11 @@ import { deleteSale, updateSale } from '@/lib/actions/sales';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useSaleDetail } from '@/lib/hooks/use-sales';
 import { isManagerRole } from '@/lib/roles';
+import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 import { useQueryClient } from '@tanstack/react-query';
 import type { PaymentMethod } from '@/types/database';
 
@@ -33,6 +35,9 @@ export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const saleQuery = useSaleDetail(id ?? null);
   const profileQuery = useMyProfile();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
+  const { openUpgradeModal } = useUpgradeModal();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -41,6 +46,10 @@ export default function SaleDetailScreen() {
   const isManager = isManagerRole(profileQuery.data?.role ?? '');
 
   async function handleShare() {
+    if (!isPremium) {
+      openUpgradeModal();
+      return;
+    }
     if (!saleQuery.data) return;
     setSharing(true);
     try {
@@ -106,8 +115,15 @@ export default function SaleDetailScreen() {
           <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Back</Text>
         </Pressable>
         <Text className="text-[16px] font-bold text-text dark:text-text-dark">{sale.receiptNumber}</Text>
-        <Pressable onPress={() => setEditOpen(true)} hitSlop={10}>
-          <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Edit</Text>
+        <Pressable onPress={() => (isPremium ? setEditOpen(true) : openUpgradeModal())} hitSlop={10}>
+          <View className="flex-row items-center gap-1.5">
+            <Text className="text-[14px] font-semibold text-accent-text dark:text-accent-text-dark">Edit</Text>
+            {!isPremium && (
+              <View className="rounded-full bg-accent-weak px-1.5 py-px dark:bg-accent-weak-dark">
+                <Text className="text-[9.5px] font-bold text-accent-text dark:text-accent-text-dark">PRO</Text>
+              </View>
+            )}
+          </View>
         </Pressable>
       </View>
 
@@ -159,11 +175,13 @@ export default function SaleDetailScreen() {
 
         <View className="mt-6 gap-2.5">
           <Button loading={sharing} onPress={handleShare}>
-            Share receipt (PDF)
+            Share receipt (PDF){!isPremium ? ' (PRO)' : ''}
           </Button>
           {isManager && (
-            <Pressable onPress={handleDelete} className="items-center py-2" disabled={deleting}>
-              <Text className="text-[13px] font-semibold text-red dark:text-red-dark">{deleting ? 'Deleting…' : 'Delete sale'}</Text>
+            <Pressable onPress={() => (isPremium ? handleDelete() : openUpgradeModal())} className="items-center py-2" disabled={deleting}>
+              <Text className="text-[13px] font-semibold text-red dark:text-red-dark">
+                {deleting ? 'Deleting…' : `Delete sale${!isPremium ? ' (PRO)' : ''}`}
+              </Text>
             </Pressable>
           )}
         </View>
