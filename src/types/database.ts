@@ -287,6 +287,26 @@ export type AccessGateState = {
   member_status: MemberStatus | null;
 };
 
+// Return shape of the get_org_entitlements() RPC — see
+// Inventra/supabase/migrations/20260726091940_freemium_premium_plans.sql.
+// Mirrors Inventra/lib/entitlements.ts's Entitlements shape (snake_case
+// here since this is the raw RPC row; src/lib/entitlements.ts maps it to
+// camelCase, same split as every other RPC in this file).
+export type OrgEntitlementsRpc = {
+  org_id: string | null;
+  tier: 'free' | 'premium';
+  plan_key: string | null;
+  status: string | null;
+  product_count: number;
+  sales_count: number;
+  expense_count: number;
+  debtor_count: number;
+  product_limit: number;
+  sales_limit: number;
+  expense_limit: number;
+  debtor_limit: number;
+};
+
 // Dashboard RPC return shapes — mirror the matching interfaces in
 // Inventra/lib/supabase/database.types.ts exactly (same RPCs, same org-scoped
 // RLS, just called directly from the client here instead of through a
@@ -713,6 +733,18 @@ export type Database = {
       };
       get_debtor_payments_total: {
         Args: Record<string, never>;
+        Returns: number;
+      };
+      get_org_entitlements: {
+        Args: Record<string, never>;
+        Returns: OrgEntitlementsRpc;
+      };
+      org_is_premium: {
+        Args: { p_org_id?: string };
+        Returns: boolean;
+      };
+      free_plan_limit: {
+        Args: { p_metric: string };
         Returns: number;
       };
       search_products: {
