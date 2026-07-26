@@ -11,6 +11,7 @@ import type { OrgEntitlementsRpc } from '@/types/database';
 export type PlanTier = 'free' | 'premium';
 
 export interface Entitlements {
+  orgId: string | null;
   tier: PlanTier;
   planKey: string | null;
   status: string | null;
@@ -25,6 +26,7 @@ export interface Entitlements {
 }
 
 const FAIL_SAFE_FREE: Entitlements = {
+  orgId: null,
   tier: 'free',
   planKey: null,
   status: null,
@@ -48,6 +50,7 @@ export async function getEntitlements(): Promise<Entitlements> {
 
   const d = data as OrgEntitlementsRpc;
   return {
+    orgId: d.org_id ?? null,
     tier: d.tier === 'premium' ? 'premium' : 'free',
     planKey: d.plan_key ?? null,
     status: d.status ?? null,

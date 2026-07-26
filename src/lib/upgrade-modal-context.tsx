@@ -1,6 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { Modal, Pressable, Text, View } from 'react-native';
+
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
+import { supabase } from '@/lib/supabase';
 
 interface UpgradeModalContextValue {
   openUpgradeModal: () => void;
@@ -10,9 +14,32 @@ const UpgradeModalContext = createContext<UpgradeModalContextValue | undefined>(
 
 // Mirrors Inventra/components/billing/EntitlementsProvider.tsx's modal —
 // mounted once near the root (src/app/_layout.tsx) so any screen can
-// trigger it via useUpgradeModal() without prop-drilling.
+// trigger it via useUpgradeModal() without prop-drilling. Also owns the
+// Phase F8 realtime listener: another device upgrading (or a payment
+// lapsing) flips this org's subscriptions row, invalidating the
+// entitlements query here so Premium unlocks (or Free limits re-apply)
+// immediately everywhere in the app, not just on next navigation.
 export function UpgradeModalProvider({ children }: PropsWithChildren) {
   const [open, setOpen] = useState(false);
+  const entitlementsQuery = useEntitlements();
+  const queryClient = useQueryClient();
+  const orgId = entitlementsQuery.data?.orgId;
+
+  useEffect(() => {
+    if (!orgId) return;
+    const channel = supabase
+      .channel(`subscriptions:org:${orgId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'subscriptions', filter: `org_id=eq.${orgId}` },
+        () => queryClient.invalidateQueries({ queryKey: ['entitlements'] }),
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [orgId, queryClient]);
 
   const value = useMemo<UpgradeModalContextValue>(() => ({ openUpgradeModal: () => setOpen(true) }), []);
 
