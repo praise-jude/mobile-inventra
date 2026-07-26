@@ -14,6 +14,7 @@ import { useColorScheme } from 'react-native';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { IntroSeenProvider, useIntroSeen } from '@/lib/first-launch';
+import { UpgradeModalProvider } from '@/lib/upgrade-modal-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -25,10 +26,12 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <IntroSeenProvider>
         <AuthProvider>
-          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-            <AnimatedSplashOverlay />
-            <RootNavigator />
-          </ThemeProvider>
+          <UpgradeModalProvider>
+            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+              <AnimatedSplashOverlay />
+              <RootNavigator />
+            </ThemeProvider>
+          </UpgradeModalProvider>
         </AuthProvider>
       </IntroSeenProvider>
     </QueryClientProvider>

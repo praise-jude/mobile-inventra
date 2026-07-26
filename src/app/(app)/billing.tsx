@@ -6,9 +6,11 @@ import { BillingManagement } from '@/components/billing-management';
 import { ComingSoon } from '@/components/coming-soon';
 import { ErrorState } from '@/components/error-state';
 import { PaystackCheckoutModal, type PaystackMessage } from '@/components/paystack-checkout';
+import { UsageDashboard } from '@/components/usage-dashboard';
 import { changePlan, initiateAddCard, cancelSubscription, reactivateSubscription } from '@/lib/actions/billing';
 import { haptics } from '@/lib/haptics';
 import { useBillingData } from '@/lib/hooks/use-billing-data';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 
 // Mirrors Inventra/app/(app)/billing/page.tsx — the same
 // BillingManagement building block used for a blocked org (see
@@ -16,6 +18,7 @@ import { useBillingData } from '@/lib/hooks/use-billing-data';
 // "Billing & subscription" copy instead of a status-blocked headline.
 export default function BillingScreen() {
   const billing = useBillingData();
+  const entitlementsQuery = useEntitlements();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accessCode, setAccessCode] = useState<string | null>(null);
@@ -111,6 +114,12 @@ export default function BillingScreen() {
         <Text className="mt-1 text-[13.5px] text-text-2 dark:text-text-2-dark">
           Manage your plan, payment method, and billing history.
         </Text>
+
+        {entitlementsQuery.data && (
+          <View className="mt-6">
+            <UsageDashboard entitlements={entitlementsQuery.data} />
+          </View>
+        )}
 
         <View className="mt-6">
           <BillingManagement

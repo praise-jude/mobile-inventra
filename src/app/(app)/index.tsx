@@ -12,8 +12,10 @@ import { Skeleton } from '@/components/skeleton';
 import { TeamPresenceCard } from '@/components/team-presence-card';
 import { DONUT_PALETTE } from '@/constants/theme';
 import { useAuth } from '@/lib/auth-context';
+import { FreePlanBanner } from '@/components/free-plan-banner';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
 import { useTeamMembers } from '@/lib/hooks/use-team';
 import { MOVEMENT_META } from '@/lib/movement-meta';
@@ -72,9 +74,14 @@ interface ExpenseBreakdownRow {
 
 export default function DashboardScreen() {
   const { session } = useAuth();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
 
   const dashboardQuery = useQuery({
-    queryKey: ['dashboard', session?.user.id],
+    // isPremium in the key so a fresh entitlements load (or a plan change)
+    // refetches with the right showAnalytics closure value below, instead
+    // of being stuck on whatever it was at the very first render.
+    queryKey: ['dashboard', session?.user.id, isPremium],
     queryFn: async () => {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -91,6 +98,10 @@ export default function DashboardScreen() {
       if (orgError) throw orgError;
 
       const isManagerTier = isManagerRole(profile.role);
+      // Free plan keeps the basic KPI cards (Today's Revenue etc. — role-
+      // gated only via isManagerTier below, unchanged) but loses the actual
+      // charts/trends/breakdowns, same split as Inventra/app/(app)/dashboard/page.tsx.
+      const showAnalytics = isManagerTier && isPremium;
 
       const [kpisRes, topSellersRes, stockHealthRes, activityRes, categoryMixRes, revenueProfitRes, salesVolumeRes, dailyProfitRes, expensesRes] =
         await Promise.all([
@@ -102,11 +113,11 @@ export default function DashboardScreen() {
             .select('id, type, qty_delta, reason, created_at, products(name), profiles(first_name, last_name)')
             .order('created_at', { ascending: false })
             .limit(5),
-          isManagerTier ? supabase.rpc('get_category_mix') : Promise.resolve({ data: [] as CategoryMixRow[], error: null }),
-          isManagerTier ? supabase.rpc('get_monthly_revenue_profit') : Promise.resolve({ data: [] as MonthlyRevenueProfitRow[], error: null }),
-          isManagerTier ? supabase.rpc('get_monthly_sales_volume') : Promise.resolve({ data: [] as MonthlySalesVolumeRow[], error: null }),
-          isManagerTier ? supabase.rpc('get_daily_product_profit') : Promise.resolve({ data: [] as DailyProductProfitRow[], error: null }),
-          isManagerTier
+          showAnalytics ? supabase.rpc('get_category_mix') : Promise.resolve({ data: [] as CategoryMixRow[], error: null }),
+          showAnalytics ? supabase.rpc('get_monthly_revenue_profit') : Promise.resolve({ data: [] as MonthlyRevenueProfitRow[], error: null }),
+          showAnalytics ? supabase.rpc('get_monthly_sales_volume') : Promise.resolve({ data: [] as MonthlySalesVolumeRow[], error: null }),
+          showAnalytics ? supabase.rpc('get_daily_product_profit') : Promise.resolve({ data: [] as DailyProductProfitRow[], error: null }),
+          showAnalytics
             ? supabase
                 .from('expenses')
                 .select('category, amount')
@@ -174,6 +185,7 @@ export default function DashboardScreen() {
         profile,
         org,
         isManagerTier,
+        showAnalytics,
         kpis: kpisRes.data,
         topSellers: topSellersRes.data ?? [],
         stockHealth: (stockHealthRes.data ?? []) as StockHealthRow[],
@@ -190,7 +202,7 @@ export default function DashboardScreen() {
         todaysProfit,
       };
     },
-    enabled: !!session,
+    enabled: !!session && !entitlementsQuery.isLoading,
   });
   const reportsPermissionQuery = useHasPermission('reports', 'view');
   const teamMembersQuery = useTeamMembers();
@@ -229,6 +241,7 @@ export default function DashboardScreen() {
     profile,
     org,
     isManagerTier,
+    showAnalytics,
     kpis,
     topSellers,
     stockHealth,
@@ -303,6 +316,7 @@ export default function DashboardScreen() {
         contentContainerClassName="px-5 pb-10 pt-2"
         refreshControl={<RefreshControl refreshing={dashboardQuery.isRefetching} onRefresh={handleRefresh} />}
       >
+        {!isPremium && <FreePlanBanner />}
         <View className="flex-row items-start justify-between">
           <View className="flex-1">
             <Text className="text-[22px] font-bold tracking-tight text-text dark:text-text-dark">
@@ -348,7 +362,7 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        {isManagerTier && (
+        {showAnalytics && (
           <>
             <View className="mt-5 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[15px] font-bold text-text dark:text-text-dark">Sales trend</Text>
@@ -519,13 +533,13 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {isManagerTier && teamMembersQuery.data && (
+        {showAnalytics && teamMembersQuery.data && (
           <View className="mt-4">
             <TeamPresenceCard members={teamMembersQuery.data} />
           </View>
         )}
 
-        {isManagerTier && (
+        {showAnalytics && (
           <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
             <View className="mb-3.5 flex-row items-start justify-between">
               <View className="flex-1">
