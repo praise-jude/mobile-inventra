@@ -2,9 +2,14 @@ import { Text, View } from 'react-native';
 
 import type { Entitlements } from '@/lib/entitlements';
 
+function barColorClass(pct: number): string {
+  if (pct >= 90) return 'bg-red dark:bg-red-dark';
+  if (pct >= 70) return 'bg-amber dark:bg-amber-dark';
+  return 'bg-green dark:bg-green-dark';
+}
+
 function UsageBar({ label, used, limit }: { label: string; used: number; limit: number }) {
   const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const nearLimit = pct >= 90;
   return (
     <View>
       <View className="mb-1.5 flex-row items-baseline justify-between">
@@ -14,10 +19,7 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
         </Text>
       </View>
       <View className="h-2 w-full overflow-hidden rounded-full bg-border-2 dark:bg-border-2-dark">
-        <View
-          className={`h-full rounded-full ${nearLimit ? 'bg-red dark:bg-red-dark' : 'bg-accent dark:bg-accent-dark'}`}
-          style={{ width: `${pct}%` }}
-        />
+        <View className={`h-full rounded-full ${barColorClass(pct)}`} style={{ width: `${pct}%` }} />
       </View>
     </View>
   );
@@ -52,7 +54,6 @@ export function UsageDashboard({ entitlements }: { entitlements: Entitlements })
           <UsageBar label="Products Used" used={entitlements.productCount} limit={entitlements.productLimit} />
           <UsageBar label="Sales Used" used={entitlements.salesCount} limit={entitlements.salesLimit} />
           <UsageBar label="Expenses Used" used={entitlements.expenseCount} limit={entitlements.expenseLimit} />
-          <UsageBar label="Debt Records Used" used={entitlements.debtorCount} limit={entitlements.debtorLimit} />
           <UsageBar label="Invoices Used" used={entitlements.invoiceCount} limit={entitlements.invoiceLimit} />
         </View>
       )}

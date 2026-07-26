@@ -5,8 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
+import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { timeAgo } from '@/lib/format';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useStockMovements } from '@/lib/hooks/use-inventory';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 
@@ -14,6 +16,8 @@ import { MOVEMENT_META } from '@/lib/movement-meta';
 // stock_movements ledger, every type.
 export default function MovementsScreen() {
   const query = useStockMovements();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
   const rows = useMemo(() => query.data?.pages.flatMap((p) => p.rows) ?? [], [query.data]);
 
   return (
@@ -25,7 +29,9 @@ export default function MovementsScreen() {
         <Text className="text-[16px] font-bold text-text dark:text-text-dark">Stock movements</Text>
       </View>
 
-      {query.isLoading ? (
+      {entitlementsQuery.data && !isPremium ? (
+        <PremiumLockedState feature="Stock movement history" />
+      ) : query.isLoading ? (
         <View className="gap-2.5 p-5">
           {Array.from({ length: 8 }).map((_, i) => (
             <Skeleton key={i} className="h-14 w-full" />

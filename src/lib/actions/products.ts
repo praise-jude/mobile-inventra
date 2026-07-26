@@ -32,7 +32,7 @@ export async function createProduct(input: CreateProductInput): Promise<string> 
   const profile = await requireProfile();
   await requirePermission('inventory', 'create');
   if (!(await canAddProduct())) {
-    throw new UpgradeRequiredError("You've reached your Free Plan limit of 50 products. Upgrade to Premium for unlimited products.");
+    throw new UpgradeRequiredError("You've reached your Free Plan limit of 20 products. Upgrade to Premium for unlimited products.");
   }
 
   const { data: product, error } = await supabase

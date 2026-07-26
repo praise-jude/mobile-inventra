@@ -24,7 +24,7 @@ export interface ExpenseInput {
 export async function createExpense(input: ExpenseInput): Promise<void> {
   const profile = await requireManagerProfile();
   if (!(await canAddExpense())) {
-    throw new UpgradeRequiredError("You've reached your Free Plan limit of 100 expenses. Upgrade to Premium for unlimited expenses.");
+    throw new UpgradeRequiredError("You've reached your Free Plan limit of 10 expenses. Upgrade to Premium for unlimited expenses.");
   }
   if (input.amount <= 0) throw new Error('Amount must be greater than zero.');
 

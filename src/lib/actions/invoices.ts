@@ -46,7 +46,7 @@ export interface InvoiceInput {
 export async function createInvoice(input: InvoiceInput): Promise<string> {
   const profile = await requireProfile();
   if (!(await canAddInvoice())) {
-    throw new UpgradeRequiredError("You've reached your Free Plan limit of 20 invoices. Upgrade to Premium for unlimited invoices.");
+    throw new UpgradeRequiredError("You've reached your Free Plan limit of 10 invoices. Upgrade to Premium for unlimited invoices.");
   }
   const customerName = input.customerName.trim();
   if (!customerName) throw new Error('Customer name is required.');

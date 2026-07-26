@@ -13,7 +13,9 @@ import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { CATEGORY_LABEL, useExpenseCategoryBreakdown, useExpensesOverview, type ExpenseRow } from '@/lib/hooks/use-expenses';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { SelectField } from '@/components/ui/select-field';
 import type { ExpenseCategory } from '@/types/database';
@@ -28,6 +30,9 @@ export default function ExpensesScreen() {
   const currency = useOrgCurrency();
   const overviewQuery = useExpensesOverview();
   const breakdownQuery = useExpenseCategoryBreakdown();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
+  const { openUpgradeModal } = useUpgradeModal();
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -98,18 +103,32 @@ export default function ExpensesScreen() {
             + New expense
           </Button>
 
-          {(breakdownQuery.data ?? []).length > 0 && (
-            <View className="gap-2 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
-              <Text className="text-[12.5px] font-bold text-text dark:text-text-dark">Last 30 days by category</Text>
-              {breakdownQuery.data!.map((b) => (
-                <View key={b.category} className="flex-row items-center justify-between">
-                  <Text className="text-[12px] text-text-2 dark:text-text-2-dark">{b.label}</Text>
-                  <Text className="text-[12px] font-semibold text-text dark:text-text-dark">
-                    {formatMoney(b.amount, currency)} · {b.pct}%
-                  </Text>
-                </View>
-              ))}
+          {!isPremium ? (
+            <View className="items-center gap-2 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <View className="rounded-full bg-accent-weak px-3 py-1 dark:bg-accent-weak-dark">
+                <Text className="text-[10.5px] font-bold text-accent-text dark:text-accent-text-dark">⭐ PREMIUM</Text>
+              </View>
+              <Text className="text-center text-[12.5px] leading-snug text-text-2 dark:text-text-2-dark">
+                Expense analytics (spend by category) are a Premium feature.
+              </Text>
+              <Button onPress={openUpgradeModal} className="mt-1 px-4">
+                Upgrade Now
+              </Button>
             </View>
+          ) : (
+            (breakdownQuery.data ?? []).length > 0 && (
+              <View className="gap-2 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+                <Text className="text-[12.5px] font-bold text-text dark:text-text-dark">Last 30 days by category</Text>
+                {breakdownQuery.data!.map((b) => (
+                  <View key={b.category} className="flex-row items-center justify-between">
+                    <Text className="text-[12px] text-text-2 dark:text-text-2-dark">{b.label}</Text>
+                    <Text className="text-[12px] font-semibold text-text dark:text-text-dark">
+                      {formatMoney(b.amount, currency)} · {b.pct}%
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )
           )}
 
           <Text className="text-[13px] font-bold text-text dark:text-text-dark">Recent expenses</Text>

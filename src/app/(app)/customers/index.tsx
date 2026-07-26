@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
+import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/format';
 import { useDebtorsOverview, type DebtorRow } from '@/lib/hooks/use-debtors';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 
 const STATUS_STYLE: Record<DebtorRow['status'], { label: string; className: string }> = {
@@ -26,6 +28,8 @@ const STATUS_STYLE: Record<DebtorRow['status'], { label: string; className: stri
 export default function CustomersScreen() {
   const currency = useOrgCurrency();
   const query = useDebtorsOverview();
+  const entitlementsQuery = useEntitlements();
+  const isPremium = entitlementsQuery.data?.tier === 'premium';
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
@@ -45,7 +49,9 @@ export default function CustomersScreen() {
         <View className="w-12" />
       </View>
 
-      {query.isLoading ? (
+      {entitlementsQuery.data && !isPremium ? (
+        <PremiumLockedState feature="Customer management" />
+      ) : query.isLoading ? (
         <View className="gap-2.5 p-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />

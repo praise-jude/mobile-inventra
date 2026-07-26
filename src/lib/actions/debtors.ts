@@ -1,8 +1,8 @@
-// Direct-Supabase equivalent of Inventra/lib/actions/debtors.ts. The screen
-// itself is manager-tier+ gated (mirrors requireManagerProfile() on the web
-// page); these actions match web's action-layer checks exactly — no extra
-// role check beyond delete being owner/admin only.
-import { canAddDebtor, UpgradeRequiredError } from '@/lib/entitlements';
+// Direct-Supabase equivalent of Inventra/lib/actions/debtors.ts. Customer
+// management is a full Premium lock (canManageCustomers()), not a
+// free-tier count limit — matches RLS on debtors/debtor_payments, which
+// blocks select/insert/update/delete entirely for Free-tier orgs.
+import { canManageCustomers, UpgradeRequiredError } from '@/lib/entitlements';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { Debtor, DebtorStatus } from '@/types/database';
@@ -18,8 +18,8 @@ export interface DebtorInput {
 
 export async function createDebtor(input: DebtorInput): Promise<void> {
   const profile = await requireProfile();
-  if (!(await canAddDebtor())) {
-    throw new UpgradeRequiredError("You've reached your Free Plan limit of 100 debt records. Upgrade to Premium for unlimited records.");
+  if (!(await canManageCustomers())) {
+    throw new UpgradeRequiredError('Customer management is a Premium feature. Upgrade to Premium to track customer credit.');
   }
   const customerName = input.customerName.trim();
   if (!customerName) throw new Error('Customer name is required.');
@@ -39,6 +39,9 @@ export async function createDebtor(input: DebtorInput): Promise<void> {
 
 export async function updateDebtor(id: string, input: DebtorInput & { status?: DebtorStatus }): Promise<void> {
   await requireProfile();
+  if (!(await canManageCustomers())) {
+    throw new UpgradeRequiredError('Customer management is a Premium feature. Upgrade to Premium to track customer credit.');
+  }
   const customerName = input.customerName.trim();
   if (!customerName) throw new Error('Customer name is required.');
 
@@ -57,12 +60,18 @@ export async function updateDebtor(id: string, input: DebtorInput & { status?: D
 
 export async function updateDebtorStatus(id: string, status: DebtorStatus): Promise<void> {
   await requireProfile();
+  if (!(await canManageCustomers())) {
+    throw new UpgradeRequiredError('Customer management is a Premium feature. Upgrade to Premium to track customer credit.');
+  }
   const { error } = await supabase.from('debtors').update({ status }).eq('id', id);
   if (error) throw new Error("Could not update the debtor's status.");
 }
 
 export async function deleteDebtor(id: string): Promise<void> {
   const profile = await requireProfile();
+  if (!(await canManageCustomers())) {
+    throw new UpgradeRequiredError('Customer management is a Premium feature. Upgrade to Premium to track customer credit.');
+  }
   if (!['owner', 'admin'].includes(profile.role)) {
     throw new Error('Only an owner or admin can delete a debtor.');
   }
@@ -73,6 +82,9 @@ export async function deleteDebtor(id: string): Promise<void> {
 
 export async function recordPayment(debtorId: string, amount: number, note?: string): Promise<void> {
   const profile = await requireProfile();
+  if (!(await canManageCustomers())) {
+    throw new UpgradeRequiredError('Customer management is a Premium feature. Upgrade to Premium to track customer credit.');
+  }
   if (amount <= 0) throw new Error('Payment amount must be greater than zero.');
 
   const { data: debtor } = await supabase.from('debtors').select('amount_owed').eq('id', debtorId).single();

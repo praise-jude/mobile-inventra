@@ -336,12 +336,10 @@ export type OrgEntitlementsRpc = {
   product_count: number;
   sales_count: number;
   expense_count: number;
-  debtor_count: number;
   invoice_count: number;
   product_limit: number;
   sales_limit: number;
   expense_limit: number;
-  debtor_limit: number;
   invoice_limit: number;
 };
 

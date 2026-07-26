@@ -21,8 +21,6 @@ export interface Entitlements {
   salesLimit: number;
   expenseCount: number;
   expenseLimit: number;
-  debtorCount: number;
-  debtorLimit: number;
   invoiceCount: number;
   invoiceLimit: number;
 }
@@ -33,15 +31,13 @@ const FAIL_SAFE_FREE: Entitlements = {
   planKey: null,
   status: null,
   productCount: 0,
-  productLimit: 50,
+  productLimit: 20,
   salesCount: 0,
-  salesLimit: 500,
+  salesLimit: 300,
   expenseCount: 0,
-  expenseLimit: 100,
-  debtorCount: 0,
-  debtorLimit: 100,
+  expenseLimit: 10,
   invoiceCount: 0,
-  invoiceLimit: 20,
+  invoiceLimit: 10,
 };
 
 // No React cache()/request-scoping on mobile (there's no "request" the way
@@ -64,8 +60,6 @@ export async function getEntitlements(): Promise<Entitlements> {
     salesLimit: Number(d.sales_limit ?? FAIL_SAFE_FREE.salesLimit),
     expenseCount: Number(d.expense_count ?? 0),
     expenseLimit: Number(d.expense_limit ?? FAIL_SAFE_FREE.expenseLimit),
-    debtorCount: Number(d.debtor_count ?? 0),
-    debtorLimit: Number(d.debtor_limit ?? FAIL_SAFE_FREE.debtorLimit),
     invoiceCount: Number(d.invoice_count ?? 0),
     invoiceLimit: Number(d.invoice_limit ?? FAIL_SAFE_FREE.invoiceLimit),
   };
@@ -97,6 +91,9 @@ export const PREMIUM_FEATURES = [
   'bulkImportExport',
   'salesEdit',
   'salesVoid',
+  'customerManagement',
+  'stockMovementHistory',
+  'expenseAnalytics',
 ] as const;
 
 export type PremiumFeature = (typeof PREMIUM_FEATURES)[number];
@@ -122,10 +119,6 @@ export async function canCreateSale(): Promise<boolean> {
 export async function canAddExpense(): Promise<boolean> {
   const e = await getEntitlements();
   return e.tier === 'premium' || e.expenseCount < e.expenseLimit;
-}
-export async function canAddDebtor(): Promise<boolean> {
-  const e = await getEntitlements();
-  return e.tier === 'premium' || e.debtorCount < e.debtorLimit;
 }
 export async function canAddInvoice(): Promise<boolean> {
   const e = await getEntitlements();
@@ -155,6 +148,9 @@ export const canUseApprovalWorkflows = () => canUseFeature('approvalWorkflows');
 export const canBulkImportExport = () => canUseFeature('bulkImportExport');
 export const canEditSale = () => canUseFeature('salesEdit');
 export const canVoidSale = () => canUseFeature('salesVoid');
+export const canManageCustomers = () => canUseFeature('customerManagement');
+export const canViewStockMovements = () => canUseFeature('stockMovementHistory');
+export const canViewExpenseAnalytics = () => canUseFeature('expenseAnalytics');
 
 // Thrown from actions when a can*() check fails, so screens can
 // distinguish "needs upgrade" from any other error and show the Upgrade
