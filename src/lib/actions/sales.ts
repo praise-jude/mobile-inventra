@@ -4,6 +4,7 @@
 // meaningful difference from web is documented below on recordSale.
 import { logAudit } from '@/lib/actions/audit';
 import { createApprovalRequest, getApprovalSettings } from '@/lib/approval-service';
+import { canCreateSale, canEditSale, canVoidSale, UpgradeRequiredError } from '@/lib/entitlements';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -162,6 +163,9 @@ export async function recordSale(input: RecordSaleInput): Promise<RecordSaleResu
   const profile = await requireProfile();
   requireSalesRole(profile);
   await requirePermission('sales', 'create');
+  if (!(await canCreateSale())) {
+    throw new UpgradeRequiredError("You've reached your Free Plan limit of 500 sales. Upgrade to Premium for unlimited sales.");
+  }
 
   const computed = await computeSale(profile.org_id, input);
 
@@ -195,6 +199,7 @@ export interface UpdateSaleInput {
 export async function updateSale(id: string, input: UpdateSaleInput): Promise<void> {
   const profile = await requireProfile();
   await requirePermission('sales', 'edit');
+  if (!(await canEditSale())) throw new UpgradeRequiredError('Editing sales requires a Premium subscription.');
 
   const { data: updated, error: saleError } = await supabase
     .from('sales')
@@ -273,6 +278,7 @@ export type DeleteSaleResult = { status: 'deleted' } | { status: 'pending_approv
 export async function deleteSale(id: string, reason?: string): Promise<DeleteSaleResult> {
   const profile = await requireProfile();
   await requirePermission('sales', 'delete');
+  if (!(await canVoidSale())) throw new UpgradeRequiredError('Voiding sales requires a Premium subscription.');
 
   const { data: sale, error: saleError } = await supabase.from('sales').select('id, total').eq('id', id).maybeSingle();
   if (saleError) throw new Error('Could not load this sale.');

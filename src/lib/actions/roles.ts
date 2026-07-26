@@ -3,6 +3,7 @@
 // enforces this at the database layer, but checking here first gives a
 // clear error instead of a silent no-op.
 import { logAudit } from '@/lib/actions/audit';
+import { canManageStaffRoles, UpgradeRequiredError } from '@/lib/entitlements';
 import type { CustomizableRole } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -16,6 +17,7 @@ function requireAdminRole(role: string) {
 export async function updateRolePermission(role: CustomizableRole, module: string, action: string, allowed: boolean): Promise<void> {
   const profile = await requireProfile();
   requireAdminRole(profile.role);
+  if (!(await canManageStaffRoles())) throw new UpgradeRequiredError('Customizing staff roles requires a Premium subscription.');
 
   const { error } = await supabase.from('role_permissions').upsert(
     {

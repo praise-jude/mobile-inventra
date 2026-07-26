@@ -6,6 +6,7 @@
 // billing has one — RLS is the real enforcement boundary either way.
 import { logAudit } from '@/lib/actions/audit';
 import { createApprovalRequest, getApprovalSettings } from '@/lib/approval-service';
+import { canAddProduct, canDeleteProduct, canEditProduct, UpgradeRequiredError } from '@/lib/entitlements';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -30,6 +31,9 @@ export interface CreateProductInput {
 export async function createProduct(input: CreateProductInput): Promise<string> {
   const profile = await requireProfile();
   await requirePermission('inventory', 'create');
+  if (!(await canAddProduct())) {
+    throw new UpgradeRequiredError("You've reached your Free Plan limit of 50 products. Upgrade to Premium for unlimited products.");
+  }
 
   const { data: product, error } = await supabase
     .from('products')
@@ -194,6 +198,7 @@ export type UpdateProductResult = { status: 'updated' } | { status: 'pending_app
 export async function updateProduct(id: string, input: UpdateProductInput): Promise<UpdateProductResult> {
   const profile = await requireProfile();
   await requirePermission('inventory', 'edit');
+  if (!(await canEditProduct())) throw new UpgradeRequiredError('Editing inventory requires a Premium subscription.');
   const name = input.name.trim();
   const sku = input.sku.trim();
   if (!name) throw new Error('Product name is required.');
@@ -268,6 +273,7 @@ export async function setProductActive(id: string, isActive: boolean): Promise<v
 export async function archiveProduct(id: string): Promise<void> {
   const profile = await requireProfile();
   await requirePermission('inventory', 'edit');
+  if (!(await canEditProduct())) throw new UpgradeRequiredError('Archiving inventory requires a Premium subscription.');
   const { data: archived, error } = await supabase
     .from('products')
     .update({ archived_at: new Date().toISOString() })
@@ -295,6 +301,7 @@ export async function archiveProduct(id: string): Promise<void> {
 export async function deleteProduct(id: string): Promise<void> {
   const profile = await requireProfile();
   await requirePermission('inventory', 'delete');
+  if (!(await canDeleteProduct())) throw new UpgradeRequiredError('Deleting inventory requires a Premium subscription.');
 
   const { count } = await supabase.from('stock_movements').select('id', { count: 'exact', head: true }).eq('product_id', id);
   if ((count ?? 0) > 0) {

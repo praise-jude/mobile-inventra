@@ -2,6 +2,7 @@
 // Actions. See lib/actions/products.ts's header comment for why this is a
 // direct client write rather than a bearer-token API route.
 import { logAudit } from '@/lib/actions/audit';
+import { canUseApprovalWorkflows, UpgradeRequiredError } from '@/lib/entitlements';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { NotificationSettings, PaperSize, Profile } from '@/types/database';
@@ -123,6 +124,7 @@ export interface ApprovalSettingsInput {
 export async function updateApprovalSettings(input: ApprovalSettingsInput): Promise<void> {
   const profile = await requireProfile();
   requireAdminRole(profile);
+  if (!(await canUseApprovalWorkflows())) throw new UpgradeRequiredError('Approval workflows require a Premium subscription.');
 
   const { error } = await supabase
     .from('approval_settings')

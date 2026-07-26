@@ -2,6 +2,7 @@
 // itself is manager-tier+ gated (mirrors requireManagerProfile() on the web
 // page); these actions match web's action-layer checks exactly — no extra
 // role check beyond delete being owner/admin only.
+import { canAddDebtor, UpgradeRequiredError } from '@/lib/entitlements';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { Debtor, DebtorStatus } from '@/types/database';
@@ -17,6 +18,9 @@ export interface DebtorInput {
 
 export async function createDebtor(input: DebtorInput): Promise<void> {
   const profile = await requireProfile();
+  if (!(await canAddDebtor())) {
+    throw new UpgradeRequiredError("You've reached your Free Plan limit of 100 debt records. Upgrade to Premium for unlimited records.");
+  }
   const customerName = input.customerName.trim();
   if (!customerName) throw new Error('Customer name is required.');
   if (input.amountOwed < 0) throw new Error("Amount owed can't be negative.");

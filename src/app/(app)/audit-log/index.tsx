@@ -5,10 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
+import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { SelectField } from '@/components/ui/select-field';
 import { useAuditLogs, useAuditModules, type AuditLogRow } from '@/lib/hooks/use-audit-log';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { isAdminRole } from '@/lib/roles';
 
@@ -22,6 +24,7 @@ function describe(row: AuditLogRow): string {
 // this screen's isAdminRole gate is UX only, RLS is the real boundary.
 export default function AuditLogScreen() {
   const profileQuery = useMyProfile();
+  const entitlementsQuery = useEntitlements();
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -41,6 +44,14 @@ export default function AuditLogScreen() {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-bg dark:bg-bg-dark px-8">
         <Text className="text-center text-[13.5px] text-muted dark:text-muted-dark">Only an owner or admin can view the audit log.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (entitlementsQuery.data && entitlementsQuery.data.tier !== 'premium') {
+    return (
+      <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
+        <PremiumLockedState feature="The audit log" />
       </SafeAreaView>
     );
   }

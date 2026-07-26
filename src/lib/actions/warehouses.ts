@@ -1,5 +1,6 @@
 // Direct-Supabase equivalent of Inventra/lib/actions/warehouses.ts.
 import { logAudit } from '@/lib/actions/audit';
+import { canManageBranches, UpgradeRequiredError } from '@/lib/entitlements';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -46,6 +47,7 @@ function normalize(input: WarehouseInput) {
 
 export async function createWarehouse(input: WarehouseInput): Promise<void> {
   const profile = await requireAdminProfile();
+  if (!(await canManageBranches())) throw new UpgradeRequiredError('Managing branches requires a Premium subscription.');
   const values = normalize(input);
   if (!values.name) throw new Error('Branch name is required.');
 
@@ -68,6 +70,7 @@ export async function createWarehouse(input: WarehouseInput): Promise<void> {
 
 export async function updateWarehouse(id: string, input: WarehouseInput): Promise<void> {
   const profile = await requireAdminProfile();
+  if (!(await canManageBranches())) throw new UpgradeRequiredError('Managing branches requires a Premium subscription.');
   const values = normalize(input);
   if (!values.name) throw new Error('Branch name is required.');
 
