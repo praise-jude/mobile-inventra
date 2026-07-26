@@ -18,6 +18,10 @@ import { isAdminRole, isManagerRole } from '@/lib/roles';
 // stays Admin-tier+, mirroring Sidebar.tsx's managerOnly/adminOnly split
 // on web.
 const ALWAYS_ROWS = [{ href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' }];
+// Invoices matches Sidebar.tsx's `hideForWarehouse` scope on web (every
+// role except Warehouse can create one) — broader than the manager-tier+
+// rows below, so it gets its own bucket rather than joining MANAGER_ROWS.
+const SALES_ROWS = [{ href: '/invoices' as const, icon: '📄', label: 'Invoices', description: 'Create and track customer invoices' }];
 const MANAGER_ROWS = [
   { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
   { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
@@ -41,9 +45,12 @@ export default function SettingsScreen() {
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
   const isManagerUp = isManagerRole(profileQuery.data?.role ?? '');
 
+  const isWarehouse = profileQuery.data?.role === 'warehouse';
+
   function Row(row: {
     href:
       | '/settings/security'
+      | '/invoices'
       | '/team'
       | '/customers'
       | '/expenses'
@@ -86,6 +93,7 @@ export default function SettingsScreen() {
 
         <View className="mt-6 gap-2.5">
           {ALWAYS_ROWS.map((row) => <Row key={row.href} {...row} />)}
+          {!isWarehouse && SALES_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {isManagerUp && MANAGER_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {isAdmin && ADMIN_ROWS.map((row) => <Row key={row.href} {...row} />)}
         </View>

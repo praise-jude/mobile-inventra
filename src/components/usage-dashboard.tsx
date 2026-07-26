@@ -45,7 +45,7 @@ export function UsageDashboard({ entitlements }: { entitlements: Entitlements })
 
       {isPremium ? (
         <Text className="text-[13px] text-text-2 dark:text-text-2-dark">
-          Unlimited products, sales, expenses, and customer credit records.
+          Unlimited products, sales, expenses, invoices, and customer credit records.
         </Text>
       ) : (
         <View className="gap-3">
@@ -53,6 +53,7 @@ export function UsageDashboard({ entitlements }: { entitlements: Entitlements })
           <UsageBar label="Sales Used" used={entitlements.salesCount} limit={entitlements.salesLimit} />
           <UsageBar label="Expenses Used" used={entitlements.expenseCount} limit={entitlements.expenseLimit} />
           <UsageBar label="Debt Records Used" used={entitlements.debtorCount} limit={entitlements.debtorLimit} />
+          <UsageBar label="Invoices Used" used={entitlements.invoiceCount} limit={entitlements.invoiceLimit} />
         </View>
       )}
     </View>

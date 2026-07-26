@@ -272,6 +272,42 @@ export type Invoice = {
   plan_key: string | null;
 };
 
+// Customer-facing invoices (customer_invoices table) — separate from
+// Invoice/InvoiceStatus above, which is Paystack billing receipts. See
+// Inventra/supabase/migrations/20260726114936_add_customer_invoices.sql.
+export type CustomerInvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'void';
+
+export type CustomerInvoice = {
+  id: string;
+  org_id: string;
+  invoice_number: string;
+  customer_name: string;
+  customer_email: string | null;
+  customer_phone: string | null;
+  status: CustomerInvoiceStatus;
+  issue_date: string;
+  due_date: string | null;
+  subtotal: number;
+  discount_amount: number;
+  tax_amount: number;
+  total: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CustomerInvoiceItem = {
+  id: string;
+  org_id: string;
+  invoice_id: string;
+  product_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+};
+
 // Return shape of the get_access_gate_state() RPC
 // (supabase/migrations/20260711090000_access_gate_rpc.sql) — a single
 // left-joined query the web middleware and this app both call to decide
@@ -301,10 +337,12 @@ export type OrgEntitlementsRpc = {
   sales_count: number;
   expense_count: number;
   debtor_count: number;
+  invoice_count: number;
   product_limit: number;
   sales_limit: number;
   expense_limit: number;
   debtor_limit: number;
+  invoice_limit: number;
 };
 
 // Dashboard RPC return shapes — mirror the matching interfaces in
@@ -644,6 +682,20 @@ export type Database = {
       debtor_payments: TableDef<
         DebtorPayment,
         Omit<DebtorPayment, 'id' | 'paid_at' | 'created_by'> & { id?: string; paid_at?: string; created_by?: string | null },
+        never
+      >;
+      customer_invoices: TableDef<
+        CustomerInvoice,
+        Omit<CustomerInvoice, 'id' | 'status' | 'created_at' | 'updated_at' | 'created_by'> & {
+          id?: string;
+          status?: CustomerInvoiceStatus;
+          created_by?: string | null;
+        },
+        Partial<Pick<CustomerInvoice, 'status'>>
+      >;
+      customer_invoice_items: TableDef<
+        CustomerInvoiceItem,
+        Omit<CustomerInvoiceItem, 'id'> & { id?: string },
         never
       >;
       expenses: TableDef<
