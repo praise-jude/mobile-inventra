@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -30,9 +30,16 @@ export default function AuditLogScreen() {
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [module, setModule] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const modulesQuery = useAuditModules();
-  const query = useAuditLogs({ search: debouncedSearch || undefined, module: module || undefined });
+  const query = useAuditLogs({
+    search: debouncedSearch || undefined,
+    module: module || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  });
 
   const moduleOptions = useMemo(
     () => [{ label: 'All modules', value: '' }, ...(modulesQuery.data ?? []).map((m) => ({ label: m, value: m }))],
@@ -76,6 +83,22 @@ export default function AuditLogScreen() {
           className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         />
         <SelectField value={module} placeholder="All modules" options={moduleOptions} onChange={setModule} searchable />
+        <View className="flex-row gap-2.5">
+          <TextInput
+            value={dateFrom}
+            onChangeText={setDateFrom}
+            placeholder="From (YYYY-MM-DD)"
+            placeholderTextColor="#aab2c4"
+            className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
+          />
+          <TextInput
+            value={dateTo}
+            onChangeText={setDateTo}
+            placeholder="To (YYYY-MM-DD)"
+            placeholderTextColor="#aab2c4"
+            className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
+          />
+        </View>
       </View>
 
       {query.isLoading ? (
@@ -94,6 +117,7 @@ export default function AuditLogScreen() {
           keyExtractor={(r) => r.id}
           {...FLATLIST_PERF_PROPS}
           contentContainerClassName="gap-2 px-4 pb-6"
+          refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           onEndReached={() => {
             if (query.hasNextPage) void query.fetchNextPage();
           }}

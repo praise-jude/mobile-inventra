@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -179,6 +179,7 @@ export default function TeamScreen() {
             keyExtractor={(m) => m.id}
             {...FLATLIST_PERF_PROPS}
             contentContainerClassName="gap-2.5 p-4 pb-10"
+            refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
             ListEmptyComponent={<EmptyState icon="👥" title="No members found" description="Try a different search or filter." />}
             renderItem={({ item: m }) => {
               const status = displayStatus(m);

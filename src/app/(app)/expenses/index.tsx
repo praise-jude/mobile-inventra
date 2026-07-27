@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -83,7 +83,18 @@ export default function ExpensesScreen() {
       ) : overviewQuery.isError ? (
         <ErrorState onRetry={() => overviewQuery.refetch()} />
       ) : (
-        <ScrollView contentContainerClassName="gap-3.5 p-4">
+        <ScrollView
+          contentContainerClassName="gap-3.5 p-4"
+          refreshControl={
+            <RefreshControl
+              refreshing={overviewQuery.isRefetching || breakdownQuery.isRefetching}
+              onRefresh={() => {
+                void overviewQuery.refetch();
+                void breakdownQuery.refetch();
+              }}
+            />
+          }
+        >
           <View className="flex-row gap-2.5">
             <View className="flex-1 rounded-2xl border border-border bg-surface p-3 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[10.5px] text-muted dark:text-muted-dark">Today</Text>

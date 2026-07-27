@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -85,6 +85,7 @@ export default function InvoicesScreen() {
               keyExtractor={(i) => i.id}
               {...FLATLIST_PERF_PROPS}
               contentContainerClassName="gap-2 px-4 pb-6"
+              refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => router.push(`/invoices/${item.id}`)}
