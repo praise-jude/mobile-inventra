@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
@@ -93,7 +93,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
-      <View className="flex-1 px-6 py-8">
+      <ScrollView contentContainerClassName="px-6 py-8" showsVerticalScrollIndicator={false}>
         <Text className="text-[22px] font-bold tracking-tight text-text dark:text-text-dark">Settings</Text>
         <Text className="mt-1 text-[13.5px] text-text-2 dark:text-text-2-dark">Signed in as {session?.user.email}</Text>
 
@@ -123,7 +123,7 @@ export default function SettingsScreen() {
         >
           Sign out
         </Button>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
