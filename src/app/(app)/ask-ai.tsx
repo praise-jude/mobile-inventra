@@ -27,6 +27,23 @@ function Answer({ children }: { children: React.ReactNode }) {
   return <Text className="text-[13px] leading-snug text-text-2 dark:text-text-2-dark">{children}</Text>;
 }
 
+const SEVERITY_STYLE: Record<'critical' | 'warning' | 'info', string> = {
+  critical: 'bg-red-weak dark:bg-red-weak-dark',
+  warning: 'bg-amber-weak dark:bg-amber-weak-dark',
+  info: 'bg-sky-weak dark:bg-sky-weak-dark',
+};
+const SEVERITY_TEXT: Record<'critical' | 'warning' | 'info', string> = {
+  critical: 'text-red dark:text-red-dark',
+  warning: 'text-amber dark:text-amber-dark',
+  info: 'text-sky dark:text-sky-dark',
+};
+
+function healthColor(score: number): string {
+  if (score >= 70) return 'text-green dark:text-green-dark';
+  if (score >= 40) return 'text-amber dark:text-amber-dark';
+  return 'text-red dark:text-red-dark';
+}
+
 export default function AskAiScreen() {
   const query = useBusinessInsights();
 
@@ -77,6 +94,9 @@ function InsightCards({ data }: { data: NonNullable<ReturnType<typeof useBusines
     totalOwed,
     highExpenseCategory,
     stockoutForecasts,
+    alerts,
+    health,
+    forecast,
   } = data;
 
   const recommendations: string[] = [];
@@ -99,6 +119,64 @@ function InsightCards({ data }: { data: NonNullable<ReturnType<typeof useBusines
 
   return (
     <>
+      <View className="rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+        <View className="mb-3 flex-row items-center justify-between">
+          <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">Business Health Score</Text>
+          <Text className={`font-mono text-[22px] font-bold ${healthColor(health.overall)}`}>{health.overall}</Text>
+        </View>
+        <View className="gap-2">
+          {health.dimensions.map((d) => (
+            <View key={d.label}>
+              <View className="mb-1 flex-row items-center justify-between">
+                <Text className="text-[12px] font-semibold text-text-2 dark:text-text-2-dark">{d.label}</Text>
+                <Text className={`font-mono text-[12px] font-bold ${d.score === null ? 'text-muted dark:text-muted-dark' : healthColor(d.score)}`}>
+                  {d.score === null ? 'N/A' : d.score}
+                </Text>
+              </View>
+              {d.score !== null && (
+                <View className="h-1.5 overflow-hidden rounded-full bg-border-2 dark:bg-border-2-dark">
+                  <View
+                    className={`h-full rounded-full ${d.score >= 70 ? 'bg-green dark:bg-green-dark' : d.score >= 40 ? 'bg-amber dark:bg-amber-dark' : 'bg-red dark:bg-red-dark'}`}
+                    style={{ width: `${d.score}%` }}
+                  />
+                </View>
+              )}
+              <Text className="mt-0.5 text-[11px] text-muted dark:text-muted-dark">{d.insight}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {alerts.length > 0 && (
+        <View className="gap-2">
+          {alerts.map((a) => (
+            <View key={a.id} className={`flex-row items-center gap-2.5 rounded-2xl p-3.5 ${SEVERITY_STYLE[a.severity]}`}>
+              <Text className="text-[16px]">{a.icon}</Text>
+              <Text className={`flex-1 text-[12.5px] font-semibold ${SEVERITY_TEXT[a.severity]}`}>{a.message}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {forecast && (
+        <Card icon="🔮" question="Forecast my sales for next month">
+          <View className="flex-row gap-4">
+            <View className="flex-1">
+              <Text className="text-[11px] text-muted dark:text-muted-dark">Projected revenue</Text>
+              <Text className="font-mono text-[16px] font-bold text-text dark:text-text-dark">{formatMoney(forecast.revenue, currency)}</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-[11px] text-muted dark:text-muted-dark">Projected profit</Text>
+              <Text className="font-mono text-[16px] font-bold text-text dark:text-text-dark">{formatMoney(forecast.profit, currency)}</Text>
+            </View>
+          </View>
+          <Text className="mt-2 text-[11px] text-muted dark:text-muted-dark">
+            {forecast.confidence === 'high' ? 'Based on 6+ months of trend — ' : forecast.confidence === 'medium' ? 'Based on a few months of trend — ' : 'Based on limited history — '}
+            a simple projection, not a guarantee.
+          </Text>
+        </Card>
+      )}
+
       <Card icon="💰" question="How much profit did I make today?">
         <Text className={`font-mono text-[20px] font-bold ${todaysProfit >= 0 ? 'text-green dark:text-green-dark' : 'text-red dark:text-red-dark'}`}>
           {formatMoney(todaysProfit, currency)}

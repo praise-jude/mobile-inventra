@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth-context';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { supabase } from '@/lib/supabase';
-import type { ExpenseCategory } from '@/types/database';
+import type { DashboardKpis, ExpenseCategory, MonthlyRevenueProfitRow } from '@/types/database';
 
 // "Ask AI" v1 — no LLM. Every card here is a plain, deterministic
 // computation over the org's own existing data (same tables/RPCs the
@@ -48,6 +48,34 @@ export interface ExpenseFlag {
   pct: number;
 }
 
+export type AlertSeverity = 'critical' | 'warning' | 'info';
+
+export interface BusinessAlert {
+  id: string;
+  severity: AlertSeverity;
+  icon: string;
+  message: string;
+}
+
+export interface HealthDimension {
+  label: string;
+  score: number | null; // null = not enough data to score this dimension
+  insight: string;
+}
+
+export interface BusinessHealth {
+  overall: number; // average of every scoreable dimension, 0-100
+  dimensions: HealthDimension[];
+}
+
+export interface MonthlyForecast {
+  revenue: number;
+  profit: number;
+  // Trailing 3-month average month-over-month growth rate used to project
+  // next month — an honest linear estimate, not a real predictive model.
+  confidence: 'low' | 'medium' | 'high';
+}
+
 export interface BusinessInsights {
   currency: string;
   timezone: string;
@@ -64,6 +92,9 @@ export interface BusinessInsights {
   totalOwed: number;
   highExpenseCategory: ExpenseFlag | null;
   stockoutForecasts: StockoutForecast[];
+  alerts: BusinessAlert[];
+  health: BusinessHealth;
+  forecast: MonthlyForecast | null;
 }
 
 const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
@@ -92,6 +123,12 @@ function startOfDayInTz(timezone: string): string {
   return `${y}-${m}-${d}T00:00:00`;
 }
 
+// 0-100, clamped — a thin wrapper so every dimension's scoring formula
+// reads the same way rather than repeating Math.max/Math.min everywhere.
+function clampScore(n: number): number {
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
 export function useBusinessInsights() {
   const { session } = useAuth();
   const entitlementsQuery = useEntitlements();
@@ -117,6 +154,8 @@ export function useBusinessInsights() {
         recentSaleMovementsRes,
         debtorsRes,
         expensesRes,
+        kpisRes,
+        revenueProfitRes,
       ] = await Promise.all([
         supabase.rpc('get_daily_product_profit'),
         supabase.from('sales').select('total').gte('created_at', todayStart),
@@ -137,6 +176,8 @@ export function useBusinessInsights() {
         // what actually distinguishes "no debtors" from "locked".
         supabase.from('debtors').select('id, customer_name, amount_owed').gt('amount_owed', 0).order('amount_owed', { ascending: false }).limit(5),
         supabase.from('expenses').select('category, amount').gte('incurred_at', monthAgo.slice(0, 10)),
+        supabase.rpc('get_kpis'),
+        supabase.rpc('get_monthly_revenue_profit'),
       ]);
 
       const dailyProfit = dailyProfitRes.data ?? [];
@@ -211,6 +252,137 @@ export function useBusinessInsights() {
         .filter((f): f is StockoutForecast => f !== null && f.daysLeft <= 30)
         .sort((a, b) => a.daysLeft - b.daysLeft);
 
+      // ---- Proactive alerts (Dashboard-surfaced, most urgent first) ----
+      const alerts: BusinessAlert[] = [];
+      const imminentStockouts = stockoutForecasts.filter((f) => f.daysLeft <= 7);
+      if (imminentStockouts.length > 0) {
+        alerts.push({
+          id: 'imminent-stockout',
+          severity: 'critical',
+          icon: '⏳',
+          message:
+            imminentStockouts.length === 1
+              ? `${imminentStockouts[0].name} will run out in ~${imminentStockouts[0].daysLeft} day${imminentStockouts[0].daysLeft === 1 ? '' : 's'}.`
+              : `${imminentStockouts.length} products will run out of stock within a week.`,
+        });
+      }
+      if (outOfStockCount > 0) {
+        alerts.push({
+          id: 'out-of-stock',
+          severity: 'critical',
+          icon: '⛔',
+          message: `${outOfStockCount} product${outOfStockCount === 1 ? ' is' : 's are'} completely out of stock right now.`,
+        });
+      }
+      if (highExpenseCategory) {
+        alerts.push({
+          id: 'high-expense',
+          severity: 'warning',
+          icon: '⚠️',
+          message: `${highExpenseCategory.label} is ${highExpenseCategory.pct}% of your last 30 days of expenses.`,
+        });
+      }
+      if (deadStock.length > 0) {
+        alerts.push({
+          id: 'dead-stock',
+          severity: 'warning',
+          icon: '😴',
+          message: `${deadStock.length} product${deadStock.length === 1 ? " hasn't" : "s haven't"} sold in 30 days.`,
+        });
+      }
+      if (!isPremium || debtors.length === 0) {
+        // no debt alert for locked/empty state
+      } else if (totalOwed > 0) {
+        alerts.push({
+          id: 'debtors',
+          severity: 'info',
+          icon: '💸',
+          message: `Customers owe you ${totalOwed.toLocaleString()} ${currency} in total.`,
+        });
+      }
+
+      // ---- Business Health Score ----
+      // Only scores dimensions with real underlying data — no placeholder
+      // numbers for things this app doesn't track (employee productivity,
+      // supplier reliability, stock-count accuracy, branch comparison).
+      const kpis = kpisRes.data as DashboardKpis | null;
+      const dimensions: HealthDimension[] = [];
+
+      const totalProducts = kpis?.total_products ?? activeProductsRes.data?.length ?? 0;
+      if (totalProducts > 0) {
+        const problemPct = ((lowStockItems.length + deadStock.length) / totalProducts) * 100;
+        const inventoryScore = clampScore(100 - problemPct * 1.5);
+        dimensions.push({
+          label: 'Inventory health',
+          score: inventoryScore,
+          insight:
+            inventoryScore >= 80
+              ? 'Stock levels and turnover look healthy.'
+              : `${lowStockItems.length} low/out-of-stock and ${deadStock.length} dead-stock items are dragging this down.`,
+        });
+      } else {
+        dimensions.push({ label: 'Inventory health', score: null, insight: 'Add products to score this.' });
+      }
+
+      if (kpis && kpis.monthly_profit !== null) {
+        const margin = kpis.today_revenue > 0 ? (todaysProfit / Math.max(kpis.today_revenue, 1)) * 100 : 0;
+        const profitScore = clampScore(kpis.monthly_profit > 0 ? 55 + margin : 30 + margin);
+        dimensions.push({
+          label: 'Profitability',
+          score: profitScore,
+          insight: kpis.monthly_profit > 0 ? 'Profitable this month.' : 'Running at a loss this month — check pricing and expenses.',
+        });
+      } else {
+        dimensions.push({ label: 'Profitability', score: null, insight: 'Record more sales to score this.' });
+      }
+
+      if (kpis && kpis.prior_monthly_profit !== null && kpis.prior_monthly_profit !== 0) {
+        const growthPct = ((kpis.monthly_profit ?? 0) - kpis.prior_monthly_profit) / Math.abs(kpis.prior_monthly_profit) * 100;
+        const growthScore = clampScore(50 + growthPct);
+        dimensions.push({
+          label: 'Sales growth',
+          score: growthScore,
+          insight: growthPct >= 0 ? `Profit is up ${Math.round(growthPct)}% vs last month.` : `Profit is down ${Math.round(Math.abs(growthPct))}% vs last month.`,
+        });
+      } else {
+        dimensions.push({ label: 'Sales growth', score: null, insight: 'Needs at least two months of history to score.' });
+      }
+
+      if (isPremium) {
+        const monthlyRevenue = kpis?.monthly_profit !== null && kpis ? kpis.today_revenue * 30 : 0;
+        const debtScore = monthlyRevenue > 0 ? clampScore(100 - (totalOwed / monthlyRevenue) * 100) : totalOwed === 0 ? 100 : 60;
+        dimensions.push({
+          label: 'Cash flow (debt)',
+          score: debtScore,
+          insight: totalOwed === 0 ? 'No outstanding customer debt.' : `${totalOwed.toLocaleString()} ${currency} owed by customers.`,
+        });
+      } else {
+        dimensions.push({ label: 'Cash flow (debt)', score: null, insight: 'Upgrade to Premium to track customer debt.' });
+      }
+
+      const scored = dimensions.filter((d): d is HealthDimension & { score: number } => d.score !== null);
+      const overall = scored.length > 0 ? clampScore(scored.reduce((sum, d) => sum + d.score, 0) / scored.length) : 0;
+
+      // ---- Simple next-month forecast (linear trend, not a real model) ----
+      const revenueProfitRows = (revenueProfitRes.data ?? []) as MonthlyRevenueProfitRow[];
+      const sortedMonths = [...revenueProfitRows].sort((a, b) => (a.month < b.month ? -1 : 1));
+      let forecast: MonthlyForecast | null = null;
+      if (sortedMonths.length >= 2) {
+        const recent = sortedMonths.slice(-3);
+        const growthRates: number[] = [];
+        for (let i = 1; i < recent.length; i++) {
+          const prevRevenue = Number(recent[i - 1].revenue);
+          if (prevRevenue > 0) growthRates.push((Number(recent[i].revenue) - prevRevenue) / prevRevenue);
+        }
+        const avgGrowth = growthRates.length > 0 ? growthRates.reduce((s, g) => s + g, 0) / growthRates.length : 0;
+        const last = recent[recent.length - 1];
+        forecast = {
+          revenue: Math.max(0, Number(last.revenue) * (1 + avgGrowth)),
+          profit: Math.max(0, Number(last.profit) * (1 + avgGrowth)),
+          confidence: sortedMonths.length >= 6 ? 'high' : sortedMonths.length >= 3 ? 'medium' : 'low',
+        };
+      }
+
       return {
         currency,
         timezone,
@@ -227,6 +399,9 @@ export function useBusinessInsights() {
         totalOwed,
         highExpenseCategory,
         stockoutForecasts,
+        alerts,
+        health: { overall, dimensions },
+        forecast,
       };
     },
     enabled: !!session && !entitlementsQuery.isLoading,

@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth-context';
 import { FreePlanBanner } from '@/components/free-plan-banner';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useBusinessInsights } from '@/lib/hooks/use-business-insights';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
@@ -210,6 +211,12 @@ export default function DashboardScreen() {
   // Falls back to the device's own timezone before the org loads — only
   // ever rendered once dashboardQuery.data is available anyway.
   const liveTime = useLiveClock(dashboardQuery.data?.org.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  // Proactive alerts — same computation Ask AI uses, surfaced here so the
+  // most urgent 1-2 signals don't require navigating away to see. Shares
+  // the React Query cache key with Ask AI, so this is a no-op refetch if
+  // that screen was already visited this session.
+  const insightsQuery = useBusinessInsights();
+  const topAlerts = insightsQuery.data?.alerts.slice(0, 2) ?? [];
 
   function handleRefresh() {
     void dashboardQuery.refetch();
@@ -341,6 +348,40 @@ export default function DashboardScreen() {
             <Text className="text-[15px]">🔔</Text>
           </Pressable>
         </View>
+
+        {topAlerts.length > 0 && (
+          <View className="mt-4 gap-2">
+            {topAlerts.map((a) => (
+              <Pressable
+                key={a.id}
+                onPress={() => {
+                  haptics.tap();
+                  router.push('/ask-ai');
+                }}
+                className={`flex-row items-center gap-2.5 rounded-2xl p-3.5 ${
+                  a.severity === 'critical'
+                    ? 'bg-red-weak dark:bg-red-weak-dark'
+                    : a.severity === 'warning'
+                      ? 'bg-amber-weak dark:bg-amber-weak-dark'
+                      : 'bg-sky-weak dark:bg-sky-weak-dark'
+                }`}
+              >
+                <Text className="text-[16px]">{a.icon}</Text>
+                <Text
+                  className={`flex-1 text-[12.5px] font-semibold ${
+                    a.severity === 'critical'
+                      ? 'text-red dark:text-red-dark'
+                      : a.severity === 'warning'
+                        ? 'text-amber dark:text-amber-dark'
+                        : 'text-sky dark:text-sky-dark'
+                  }`}
+                >
+                  {a.message}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <Pressable
           onPress={() => {
