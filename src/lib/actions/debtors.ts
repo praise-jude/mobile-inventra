@@ -14,7 +14,6 @@ export interface DebtorInput {
   amountOwed: number;
   dueDate?: string;
   notes?: string;
-  dateOfBirth?: string;
 }
 
 export async function createDebtor(input: DebtorInput): Promise<void> {
@@ -34,7 +33,6 @@ export async function createDebtor(input: DebtorInput): Promise<void> {
     amount_owed: input.amountOwed,
     due_date: input.dueDate || null,
     notes: input.notes?.trim() || null,
-    date_of_birth: input.dateOfBirth || null,
   });
   if (error) throw new Error('Could not create the debtor.');
 }
@@ -47,13 +45,12 @@ export async function updateDebtor(id: string, input: DebtorInput & { status?: D
   const customerName = input.customerName.trim();
   if (!customerName) throw new Error('Customer name is required.');
 
-  const patch: Partial<Pick<Debtor, 'customer_name' | 'phone' | 'email' | 'notes' | 'due_date' | 'status' | 'date_of_birth'>> = {
+  const patch: Partial<Pick<Debtor, 'customer_name' | 'phone' | 'email' | 'notes' | 'due_date' | 'status'>> = {
     customer_name: customerName,
     phone: input.phone?.trim() || null,
     email: input.email?.trim() || null,
     due_date: input.dueDate || null,
     notes: input.notes?.trim() || null,
-    date_of_birth: input.dateOfBirth || null,
   };
   if (input.status) patch.status = input.status;
 

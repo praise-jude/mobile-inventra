@@ -13,19 +13,6 @@ function effectiveStatus(status: DebtorStatus, dueDate: string | null): DebtorSt
   return status;
 }
 
-// Days until the next occurrence of a date_of_birth's month/day (ignores
-// year — this is a recurring anniversary, not an age calculation). Returns
-// null for no birthday on file.
-export function daysUntilBirthday(dateOfBirth: string | null): number | null {
-  if (!dateOfBirth) return null;
-  const dob = new Date(dateOfBirth);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  let next = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
-  if (next < today) next = new Date(today.getFullYear() + 1, dob.getMonth(), dob.getDate());
-  return Math.round((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
 export type CustomerSegment = 'new' | 'high_value' | 'overdue' | 'paid_up' | 'standard';
 
 export interface DebtorRow {
@@ -37,7 +24,6 @@ export interface DebtorRow {
   amountOwed: number;
   dueDate: string | null;
   status: DebtorStatus;
-  dateOfBirth: string | null;
   createdAt: string;
 }
 
@@ -57,7 +43,7 @@ export function useDebtorsOverview() {
       const [{ data: debtors, error: debError }, { data: totalPaidRaw, error: payError }] = await Promise.all([
         supabase
           .from('debtors')
-          .select('id, customer_name, phone, email, notes, amount_owed, due_date, status, date_of_birth, created_at')
+          .select('id, customer_name, phone, email, notes, amount_owed, due_date, status, created_at')
           .order('created_at', { ascending: false }),
         supabase.rpc('get_debtor_payments_total'),
       ]);
@@ -82,7 +68,6 @@ export function useDebtorsOverview() {
           amountOwed: Number(d.amount_owed),
           dueDate: d.due_date,
           status: d.status,
-          dateOfBirth: d.date_of_birth,
           createdAt: d.created_at,
         })),
       };
@@ -126,7 +111,7 @@ export function useDebtorDetail(id: string | null) {
     queryFn: async (): Promise<DebtorDetail> => {
       const { data: debtor, error: debError } = await supabase
         .from('debtors')
-        .select('id, customer_name, phone, email, notes, amount_owed, due_date, status, date_of_birth, created_at')
+        .select('id, customer_name, phone, email, notes, amount_owed, due_date, status, created_at')
         .eq('id', id!)
         .single();
       if (debError || !debtor) throw new Error('Could not load this debtor.');
@@ -149,7 +134,6 @@ export function useDebtorDetail(id: string | null) {
         amountOwed: Number(debtor.amount_owed),
         dueDate: debtor.due_date,
         status: effectiveStatus(debtor.status, debtor.due_date),
-        dateOfBirth: debtor.date_of_birth,
         createdAt: debtor.created_at,
         // Lifetime value = everything ever paid plus what's currently
         // still owed — the full relationship value, not just the open

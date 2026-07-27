@@ -18,7 +18,6 @@ export default function NewCustomerScreen() {
     amountOwed: '0',
     dueDate: '',
     notes: '',
-    dateOfBirth: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +54,6 @@ export default function NewCustomerScreen() {
         <TextField label="Email (optional)" value={form.email} onChangeText={(v) => setForm((f) => ({ ...f, email: v }))} keyboardType="email-address" autoCapitalize="none" />
         <TextField label="Amount owed" value={form.amountOwed} onChangeText={(v) => setForm((f) => ({ ...f, amountOwed: v }))} keyboardType="numeric" />
         <TextField label="Due date (YYYY-MM-DD, optional)" value={form.dueDate} onChangeText={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
-        <TextField
-          label="Birthday (YYYY-MM-DD, optional)"
-          value={form.dateOfBirth}
-          onChangeText={(v) => setForm((f) => ({ ...f, dateOfBirth: v }))}
-        />
         <TextField label="Notes (optional)" value={form.notes} onChangeText={(v) => setForm((f) => ({ ...f, notes: v }))} multiline />
 
         {error && <Text className="text-[13px] font-medium text-red dark:text-red-dark">{error}</Text>}

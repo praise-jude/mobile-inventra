@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
-import { daysUntilBirthday, segmentFor, useDebtorsOverview, type CustomerSegment, type DebtorRow } from '@/lib/hooks/use-debtors';
+import { segmentFor, useDebtorsOverview, type CustomerSegment, type DebtorRow } from '@/lib/hooks/use-debtors';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 
@@ -136,14 +136,6 @@ export default function CustomersScreen() {
                       <View className={`self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
                         <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
                       </View>
-                      {(() => {
-                        const birthdayIn = daysUntilBirthday(item.dateOfBirth);
-                        return birthdayIn !== null && birthdayIn <= 14 ? (
-                          <View className="self-start rounded-full bg-accent-weak px-2 py-0.5 dark:bg-accent-weak-dark">
-                            <Text className="text-[10.5px] font-bold text-accent-text dark:text-accent-text-dark">🎂 {birthdayIn}d</Text>
-                          </View>
-                        ) : null;
-                      })()}
                     </View>
                   </View>
                   <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.amountOwed, currency)}</Text>
