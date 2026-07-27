@@ -164,6 +164,7 @@ export type Debtor = {
   amount_owed: number;
   due_date: string | null;
   status: DebtorStatus;
+  date_of_birth: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -692,8 +693,13 @@ export type Database = {
       customers: TableDef<Customer, Omit<Customer, 'id' | 'created_at'> & { id?: string }, never>;
       debtors: TableDef<
         Debtor,
-        Omit<Debtor, 'id' | 'created_at' | 'updated_at' | 'status' | 'created_by'> & { id?: string; status?: DebtorStatus; created_by?: string | null },
-        Partial<Pick<Debtor, 'customer_name' | 'phone' | 'email' | 'notes' | 'amount_owed' | 'due_date' | 'status'>>
+        Omit<Debtor, 'id' | 'created_at' | 'updated_at' | 'status' | 'created_by' | 'date_of_birth'> & {
+          id?: string;
+          status?: DebtorStatus;
+          created_by?: string | null;
+          date_of_birth?: string | null;
+        },
+        Partial<Pick<Debtor, 'customer_name' | 'phone' | 'email' | 'notes' | 'amount_owed' | 'due_date' | 'status' | 'date_of_birth'>>
       >;
       debtor_payments: TableDef<
         DebtorPayment,

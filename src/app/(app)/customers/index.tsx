@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
-import { useDebtorsOverview, type DebtorRow } from '@/lib/hooks/use-debtors';
+import { daysUntilBirthday, segmentFor, useDebtorsOverview, type CustomerSegment, type DebtorRow } from '@/lib/hooks/use-debtors';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 
@@ -22,6 +22,14 @@ const STATUS_STYLE: Record<DebtorRow['status'], { label: string; className: stri
   cancelled: { label: 'Cancelled', className: 'text-muted dark:text-muted-dark bg-border-2 dark:bg-border-2-dark' },
 };
 
+const SEGMENT_FILTERS: { key: CustomerSegment | ''; label: string }[] = [
+  { key: '', label: 'All' },
+  { key: 'high_value', label: '⭐ High value' },
+  { key: 'overdue', label: '⚠️ Overdue' },
+  { key: 'new', label: '🆕 New' },
+  { key: 'paid_up', label: '✅ Paid up' },
+];
+
 // Mirrors Inventra/components/debtors/DebtorsClient.tsx — Sidebar.tsx labels
 // this nav item "Customers" though the table/module is "Debtors" (credit
 // tracking), same "DB name stays, UI label changes" pattern as Warehouses/
@@ -32,13 +40,18 @@ export default function CustomersScreen() {
   const entitlementsQuery = useEntitlements();
   const isPremium = entitlementsQuery.data?.tier === 'premium';
   const [search, setSearch] = useState('');
+  const [segmentFilter, setSegmentFilter] = useState<CustomerSegment | ''>('');
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const rows = query.data?.debtors ?? [];
-    if (!q) return rows;
-    return rows.filter((d) => d.customerName.toLowerCase().includes(q));
-  }, [query.data, search]);
+    const amounts = rows.map((d) => d.amountOwed).filter((a) => a > 0);
+    return rows.filter((d) => {
+      if (q && !d.customerName.toLowerCase().includes(q)) return false;
+      if (segmentFilter && segmentFor(d, amounts) !== segmentFilter) return false;
+      return true;
+    });
+  }, [query.data, search, segmentFilter]);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -86,6 +99,23 @@ export default function CustomersScreen() {
             </Button>
           </View>
 
+          <View className="flex-row flex-wrap gap-2 px-4 pb-2">
+            {SEGMENT_FILTERS.map((f) => {
+              const active = segmentFilter === f.key;
+              return (
+                <Pressable
+                  key={f.key || 'all'}
+                  onPress={() => setSegmentFilter(f.key)}
+                  className={`rounded-full border px-3 py-1.5 ${active ? 'border-accent bg-accent-weak dark:border-accent-dark dark:bg-accent-weak-dark' : 'border-border bg-surface dark:border-border-dark dark:bg-surface-dark'}`}
+                >
+                  <Text className={`text-[12px] font-semibold ${active ? 'text-accent-text dark:text-accent-text-dark' : 'text-text-2 dark:text-text-2-dark'}`}>
+                    {f.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
           {filtered.length === 0 ? (
             <EmptyState icon="💵" title="No customers" description="Track a customer's credit balance to see them here." />
           ) : (
@@ -102,8 +132,18 @@ export default function CustomersScreen() {
                 >
                   <View className="flex-1">
                     <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark">{item.customerName}</Text>
-                    <View className={`mt-1.5 self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
-                      <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
+                    <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
+                      <View className={`self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
+                        <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
+                      </View>
+                      {(() => {
+                        const birthdayIn = daysUntilBirthday(item.dateOfBirth);
+                        return birthdayIn !== null && birthdayIn <= 14 ? (
+                          <View className="self-start rounded-full bg-accent-weak px-2 py-0.5 dark:bg-accent-weak-dark">
+                            <Text className="text-[10.5px] font-bold text-accent-text dark:text-accent-text-dark">🎂 {birthdayIn}d</Text>
+                          </View>
+                        ) : null;
+                      })()}
                     </View>
                   </View>
                   <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.amountOwed, currency)}</Text>

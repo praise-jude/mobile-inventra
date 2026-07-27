@@ -11,7 +11,7 @@ import { deleteDebtor, recordPayment, updateDebtor, type DebtorInput } from '@/l
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { useDebtorDetail } from '@/lib/hooks/use-debtors';
+import { daysUntilBirthday, useDebtorDetail, useDebtorsOverview } from '@/lib/hooks/use-debtors';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 import { isAdminRole } from '@/lib/roles';
@@ -24,6 +24,7 @@ export default function CustomerDetailScreen() {
   const profileQuery = useMyProfile();
   const currency = useOrgCurrency();
   const query = useDebtorDetail(id ?? null);
+  const overviewQuery = useDebtorsOverview();
   const canDelete = isAdminRole(profileQuery.data?.role ?? '');
 
   const [editing, setEditing] = useState(false);
@@ -48,6 +49,7 @@ export default function CustomerDetailScreen() {
       email: query.data.email ?? '',
       dueDate: query.data.dueDate ?? '',
       notes: query.data.notes ?? '',
+      dateOfBirth: query.data.dateOfBirth ?? '',
     });
     setEditing(true);
   }
@@ -119,6 +121,21 @@ export default function CustomerDetailScreen() {
   }
 
   const debtor = query.data;
+  const birthdayIn = daysUntilBirthday(debtor.dateOfBirth);
+
+  // Gold/Silver tier is ranked against the org's own other customers'
+  // amount owed (not a hardcoded currency figure, which wouldn't mean the
+  // same thing across currencies) — the same basis the list screen's
+  // "high value" segment uses, so the two stay consistent.
+  const amounts = (overviewQuery.data?.debtors ?? []).map((d) => d.amountOwed).filter((a) => a > 0);
+  let tier: { label: string; icon: string; className: string } = { label: 'Bronze', icon: '🥉', className: 'text-muted dark:text-muted-dark bg-border-2 dark:bg-border-2-dark' };
+  if (amounts.length >= 3) {
+    const sorted = [...amounts].sort((a, b) => b - a);
+    const gold = sorted[Math.max(0, Math.floor(sorted.length * 0.1) - 1)];
+    const silver = sorted[Math.max(0, Math.floor(sorted.length * 0.4) - 1)];
+    if (debtor.lifetimeValue >= gold) tier = { label: 'Gold', icon: '🥇', className: 'text-amber dark:text-amber-dark bg-amber-weak dark:bg-amber-weak-dark' };
+    else if (debtor.lifetimeValue >= silver) tier = { label: 'Silver', icon: '🥈', className: 'text-text-2 dark:text-text-2-dark bg-surface-2 dark:bg-surface-2-dark' };
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -137,6 +154,7 @@ export default function CustomerDetailScreen() {
             <TextField label="Phone" value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" />
             <TextField label="Email" value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} keyboardType="email-address" autoCapitalize="none" />
             <TextField label="Due date (YYYY-MM-DD)" value={form.dueDate} onChangeText={(v) => setForm({ ...form, dueDate: v })} />
+            <TextField label="Birthday (YYYY-MM-DD)" value={form.dateOfBirth} onChangeText={(v) => setForm({ ...form, dateOfBirth: v })} />
             <TextField label="Notes" value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline />
             {error && <Text className="text-[13px] font-medium text-red dark:text-red-dark">{error}</Text>}
             <Button loading={saving} onPress={handleSave} className="mt-2">
@@ -146,11 +164,30 @@ export default function CustomerDetailScreen() {
         ) : (
           <>
             <View className="rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
-              <Text className="text-[11px] text-muted dark:text-muted-dark">Amount owed</Text>
-              <Text className="text-[22px] font-bold text-text dark:text-text-dark">{formatMoney(debtor.amountOwed, currency)}</Text>
+              <View className="flex-row items-start justify-between">
+                <View>
+                  <Text className="text-[11px] text-muted dark:text-muted-dark">Amount owed</Text>
+                  <Text className="text-[22px] font-bold text-text dark:text-text-dark">{formatMoney(debtor.amountOwed, currency)}</Text>
+                </View>
+                <View className={`flex-row items-center gap-1 rounded-full px-2.5 py-1 ${tier.className}`}>
+                  <Text className="text-[11px]">{tier.icon}</Text>
+                  <Text className={`text-[10.5px] font-bold ${tier.className}`}>{tier.label}</Text>
+                </View>
+              </View>
+              <Text className="mt-1.5 text-[11.5px] text-muted dark:text-muted-dark">
+                Lifetime value: {formatMoney(debtor.lifetimeValue, currency)}
+              </Text>
               {debtor.phone && <Text className="mt-2 text-[12.5px] text-text-2 dark:text-text-2-dark">{debtor.phone}</Text>}
               {debtor.email && <Text className="text-[12.5px] text-text-2 dark:text-text-2-dark">{debtor.email}</Text>}
               {debtor.dueDate && <Text className="text-[12.5px] text-text-2 dark:text-text-2-dark">Due {debtor.dueDate}</Text>}
+              {debtor.dateOfBirth && <Text className="text-[12.5px] text-text-2 dark:text-text-2-dark">Birthday {debtor.dateOfBirth}</Text>}
+              {birthdayIn !== null && birthdayIn <= 14 && (
+                <View className="mt-2 self-start rounded-full bg-accent-weak px-2.5 py-1 dark:bg-accent-weak-dark">
+                  <Text className="text-[11px] font-bold text-accent-text dark:text-accent-text-dark">
+                    🎂 {birthdayIn === 0 ? "Birthday today!" : `Birthday in ${birthdayIn} day${birthdayIn === 1 ? '' : 's'}`}
+                  </Text>
+                </View>
+              )}
               {debtor.notes && <Text className="mt-1 text-[12.5px] text-text-2 dark:text-text-2-dark">{debtor.notes}</Text>}
             </View>
 
