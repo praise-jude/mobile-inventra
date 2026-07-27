@@ -9,11 +9,12 @@ import '@/global.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { IntroSeenProvider, useIntroSeen } from '@/lib/first-launch';
+import { ThemePreferenceProvider } from '@/lib/theme-preference-context';
 import { UpgradeModalProvider } from '@/lib/upgrade-modal-context';
 
 SplashScreen.preventAutoHideAsync();
@@ -23,18 +24,20 @@ const queryClient = new QueryClient();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
-    <QueryClientProvider client={queryClient}>
-      <IntroSeenProvider>
-        <AuthProvider>
-          <UpgradeModalProvider>
-            <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-              <AnimatedSplashOverlay />
-              <RootNavigator />
-            </ThemeProvider>
-          </UpgradeModalProvider>
-        </AuthProvider>
-      </IntroSeenProvider>
-    </QueryClientProvider>
+    <ThemePreferenceProvider>
+      <QueryClientProvider client={queryClient}>
+        <IntroSeenProvider>
+          <AuthProvider>
+            <UpgradeModalProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <AnimatedSplashOverlay />
+                <RootNavigator />
+              </ThemeProvider>
+            </UpgradeModalProvider>
+          </AuthProvider>
+        </IntroSeenProvider>
+      </QueryClientProvider>
+    </ThemePreferenceProvider>
   );
 }
 

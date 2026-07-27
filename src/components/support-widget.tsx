@@ -1,14 +1,27 @@
 import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BottomTabInset } from '@/constants/theme';
 import { haptics } from '@/lib/haptics';
 import { useSupportSettings } from '@/lib/hooks/use-support-settings';
+
+// Gap above the native tab bar, per spec (24-32px) — the midpoint. Combined
+// with BottomTabInset (constants/theme.ts's existing, previously-unused
+// per-platform native tab bar height estimate) and the device's own safe
+// area, since NativeTabs (expo-router/unstable-native-tabs) renders as a
+// true native tab bar with no JS-measurable height API — there's no exact
+// alternative short of expo-router's iOS-only NativeTabs.BottomAccessory,
+// which would need restructuring this into the tab layout itself and still
+// wouldn't cover Android.
+const GAP_ABOVE_TAB_BAR = 28;
 
 // Mirrors Inventra/components/support/SupportWidget.tsx — a floating
 // WhatsApp chat bubble driven by the same admin-configured
 // support_settings row (business hours/average response/enabled flags).
 export function SupportWidget() {
   const query = useSupportSettings();
+  const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
   const settings = query.data;
 
@@ -22,7 +35,11 @@ export function SupportWidget() {
   }
 
   return (
-    <View className="absolute bottom-6 right-5" pointerEvents="box-none">
+    <View
+      className="absolute right-5"
+      style={{ bottom: insets.bottom + BottomTabInset + GAP_ABOVE_TAB_BAR }}
+      pointerEvents="box-none"
+    >
       {open && (
         <View className="mb-3 w-[260px] rounded-2xl border border-border bg-surface p-4 shadow-lg dark:border-border-dark dark:bg-surface-dark">
           <Text className="text-[14px] font-bold text-text dark:text-text-dark">Need help?</Text>
@@ -37,6 +54,8 @@ export function SupportWidget() {
           ) : null}
           <Pressable
             onPress={openWhatsApp}
+            accessibilityRole="button"
+            accessibilityLabel="Chat on WhatsApp"
             className="mt-3 h-9 items-center justify-center rounded-[9px] border border-border bg-surface dark:border-border-dark dark:bg-surface-dark"
           >
             <Text className="text-[12.5px] font-semibold text-text dark:text-text-dark">Chat on WhatsApp</Text>
@@ -48,10 +67,12 @@ export function SupportWidget() {
           haptics.tap();
           setOpen((v) => !v);
         }}
-        className="h-14 w-14 items-center justify-center rounded-full shadow-lg"
+        accessibilityRole="button"
+        accessibilityLabel={open ? 'Close support options' : 'Open support options'}
+        className="h-9 w-9 items-center justify-center rounded-full shadow-lg"
         style={{ backgroundColor: '#25D366' }}
       >
-        <Text className="text-[26px]">💬</Text>
+        <Text className="text-[17px]">💬</Text>
       </Pressable>
     </View>
   );

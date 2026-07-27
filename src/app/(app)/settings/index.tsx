@@ -18,6 +18,7 @@ import { isAdminRole, isManagerRole } from '@/lib/roles';
 // stays Admin-tier+, mirroring Sidebar.tsx's managerOnly/adminOnly split
 // on web.
 const ALWAYS_ROWS = [
+  { href: '/settings/appearance' as const, icon: '🎨', label: 'Appearance', description: 'Light, dark, or match your device' },
   { href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' },
   { href: '/support' as const, icon: '💬', label: 'Contact support', description: 'Email or WhatsApp us directly' },
 ];
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
 
   function Row(row: {
     href:
+      | '/settings/appearance'
       | '/settings/security'
       | '/support'
       | '/invoices'

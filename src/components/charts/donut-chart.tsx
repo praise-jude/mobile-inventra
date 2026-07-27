@@ -1,7 +1,7 @@
-import { useColorScheme } from 'react-native';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 
 import { ChartColors, DONUT_PALETTE } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
 // RN-SVG port of Inventra/components/charts/DonutChart.tsx — same ring-
 // segment math (stroke-dasharray/dashoffset trick on a plain <circle>),
