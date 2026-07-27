@@ -16,6 +16,7 @@ import { FreePlanBanner } from '@/components/free-plan-banner';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
+import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
 import { useTeamMembers } from '@/lib/hooks/use-team';
 import { MOVEMENT_META } from '@/lib/movement-meta';
@@ -206,6 +207,9 @@ export default function DashboardScreen() {
   });
   const reportsPermissionQuery = useHasPermission('reports', 'view');
   const teamMembersQuery = useTeamMembers();
+  // Falls back to the device's own timezone before the org loads — only
+  // ever rendered once dashboardQuery.data is available anyway.
+  const liveTime = useLiveClock(dashboardQuery.data?.org.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   function handleRefresh() {
     void dashboardQuery.refetch();
@@ -322,7 +326,9 @@ export default function DashboardScreen() {
             <Text className="text-[22px] font-bold tracking-tight text-text dark:text-text-dark">
               {greeting.emoji} {greeting.label}, {profile.first_name}
             </Text>
-            <Text className="mt-0.5 text-[13px] text-text-2 dark:text-text-2-dark">{today}</Text>
+            <Text className="mt-0.5 text-[13px] text-text-2 dark:text-text-2-dark">
+              {today} · 🕒 {liveTime}
+            </Text>
           </View>
           <Pressable
             onPress={() => {
@@ -335,6 +341,23 @@ export default function DashboardScreen() {
             <Text className="text-[15px]">🔔</Text>
           </Pressable>
         </View>
+
+        <Pressable
+          onPress={() => {
+            haptics.tap();
+            router.push('/ask-ai');
+          }}
+          className="mt-4 flex-row items-center gap-3 rounded-2xl border border-accent bg-accent-weak p-3.5 dark:border-accent-dark dark:bg-accent-weak-dark"
+        >
+          <View className="h-9 w-9 items-center justify-center rounded-[10px] bg-accent dark:bg-accent-dark">
+            <Text className="text-[16px]">✨</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-[13.5px] font-bold text-accent-text dark:text-accent-text-dark">Ask AI</Text>
+            <Text className="text-[11px] text-accent-text dark:text-accent-text-dark">Instant answers about profit, stock, and customers</Text>
+          </View>
+          <Text className="text-accent-text dark:text-accent-text-dark">›</Text>
+        </Pressable>
 
         <View className="mt-4 flex-row flex-wrap gap-3">
           {kpiCards.map((k) => (

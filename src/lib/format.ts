@@ -51,9 +51,21 @@ export function greetingFor(timezone: string): { emoji: string; label: string } 
     new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: timezone }).format(new Date()),
   );
   const hour = rawHour % 24;
-  if (hour < 12) return { emoji: '🌅', label: 'Good Morning' };
-  if (hour < 17) return { emoji: '☀️', label: 'Good Afternoon' };
-  return { emoji: '🌙', label: 'Good Evening' };
+  if (hour >= 5 && hour < 12) return { emoji: '🌅', label: 'Good Morning' };
+  if (hour >= 12 && hour < 17) return { emoji: '☀️', label: 'Good Afternoon' };
+  if (hour >= 17 && hour < 21) return { emoji: '🌇', label: 'Good Evening' };
+  return { emoji: '🌙', label: 'Good Night' };
+}
+
+// Locale left as `undefined` (not hardcoded 'en-US' the way formatTodayHeader
+// is) so 12-hour vs 24-hour formatting follows the device's own system
+// setting rather than always forcing AM/PM.
+export function formatCurrentTime(timezone: string): string {
+  return new Date().toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: timezone,
+  });
 }
 
 export function timeAgo(iso: string): string {
