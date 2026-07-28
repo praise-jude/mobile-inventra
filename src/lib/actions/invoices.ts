@@ -109,3 +109,60 @@ export async function deleteInvoice(id: string): Promise<void> {
   const { error } = await supabase.from('customer_invoices').delete().eq('id', id);
   if (error) throw new Error('Could not delete the invoice.');
 }
+
+// Cloud Storage archival needs a Google service-account key, which this
+// bundle can never hold — same reason invite/resendInvite/removeMember in
+// actions/team.ts go through app/api/mobile/team/* instead of talking to
+// Supabase directly. These two hit the matching
+// app/api/mobile/invoices/[id]/{archive-pdf,pdf-url} routes.
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+// Best-effort: called after the existing local PDF share (Print +
+// Sharing) already succeeded, never instead of it. Swallow failures at
+// the call site — an unreachable API or unconfigured Cloud Storage on
+// the backend should never block sharing the invoice.
+export async function archiveInvoicePdf(id: string, localPdfUri: string): Promise<void> {
+  if (!API_URL) throw new Error('Missing EXPO_PUBLIC_API_URL.');
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+
+  // Same fetch(localUri) -> arrayBuffer() -> raw-bytes-in-body pattern as
+  // products.ts's uploadProductImage, sent straight through as the
+  // request body rather than wrapped in FormData.
+  const localResponse = await fetch(localPdfUri);
+  const arrayBuffer = await localResponse.arrayBuffer();
+
+  const response = await fetch(`${API_URL}/api/mobile/invoices/${id}/archive-pdf`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/pdf' },
+    body: arrayBuffer,
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error ?? 'Could not archive the invoice PDF.');
+  }
+}
+
+// Returns null (never throws) when there's no archived copy yet or the
+// request fails — this is a "bonus" retrieval path, callers should treat
+// null as "nothing to show" rather than surfacing an error.
+export async function getInvoicePdfArchiveUrl(id: string): Promise<string | null> {
+  if (!API_URL) return null;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) return null;
+
+    const response = await fetch(`${API_URL}/api/mobile/invoices/${id}/pdf-url`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    return body.url ?? null;
+  } catch {
+    return null;
+  }
+}

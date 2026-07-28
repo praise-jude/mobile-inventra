@@ -3,12 +3,12 @@ import * as Print from 'expo-print';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState } from '@/components/error-state';
 import { Button } from '@/components/ui/button';
-import { deleteInvoice, updateInvoiceStatus } from '@/lib/actions/invoices';
+import { archiveInvoicePdf, deleteInvoice, getInvoicePdfArchiveUrl, updateInvoiceStatus } from '@/lib/actions/invoices';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
@@ -82,6 +82,7 @@ export default function InvoiceDetailScreen() {
   const [statusBusy, setStatusBusy] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cloudBusy, setCloudBusy] = useState(false);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['invoice-detail', id] });
@@ -115,10 +116,31 @@ export default function InvoiceDetailScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: query.data.invoiceNumber });
       }
+      // Best-effort cloud archive — the share above already happened;
+      // this just also keeps a durable copy. Never surfaces an error for
+      // the share itself if this fails.
+      if (id) archiveInvoicePdf(id, uri).catch(() => {});
     } catch {
       notifyAlert('Error', 'Could not generate the invoice PDF.');
     } finally {
       setSharing(false);
+    }
+  }
+
+  async function handleViewCloudCopy() {
+    if (!id) return;
+    setCloudBusy(true);
+    try {
+      const url = await getInvoicePdfArchiveUrl(id);
+      if (!url) {
+        notifyAlert('No cloud copy yet', 'Share the invoice PDF first to create one.');
+        return;
+      }
+      await Linking.openURL(url);
+    } catch {
+      notifyAlert('Error', 'Could not reach the cloud copy right now.');
+    } finally {
+      setCloudBusy(false);
     }
   }
 
@@ -247,6 +269,9 @@ export default function InvoiceDetailScreen() {
         <View className="mt-2 gap-2.5">
           <Button loading={sharing} onPress={handleShare}>
             Share invoice (PDF){!isPremium ? ' (PRO)' : ''}
+          </Button>
+          <Button variant="secondary" loading={cloudBusy} onPress={handleViewCloudCopy}>
+            ☁️ View cloud copy
           </Button>
           {canManage && (
             <Pressable onPress={handleDelete} className="items-center py-2" disabled={deleting}>
