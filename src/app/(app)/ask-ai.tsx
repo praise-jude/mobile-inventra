@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
+import { logAudit } from '@/lib/actions/audit';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useBusinessInsights } from '@/lib/hooks/use-business-insights';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
 
 // "Ask AI" v1 — see use-business-insights.ts's header comment: this is
 // pre-computed insight cards over the org's real data, not a free-text
@@ -46,6 +49,26 @@ function healthColor(score: number): string {
 
 export default function AskAiScreen() {
   const query = useBusinessInsights();
+  const profileQuery = useMyProfile();
+
+  // Once per mount, not once per react-query background refetch — this is
+  // a "viewed Ask AI" usage signal, not something that should spam a new
+  // entry every time the underlying insights silently revalidate.
+  const logged = useRef(false);
+  useEffect(() => {
+    if (logged.current || !query.isSuccess || !profileQuery.data) return;
+    logged.current = true;
+    const profile = profileQuery.data;
+    void logAudit({
+      orgId: profile.org_id,
+      actorId: profile.id,
+      actorName: `${profile.first_name} ${profile.last_name}`,
+      actorRole: profile.role,
+      action: 'ai.viewed',
+      module: 'Ask AI',
+      entityType: 'business_insights',
+    });
+  }, [query.isSuccess, profileQuery.data]);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
