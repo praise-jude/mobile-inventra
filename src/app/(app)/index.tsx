@@ -17,6 +17,7 @@ import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, p
 import { haptics } from '@/lib/haptics';
 import { useBusinessInsights } from '@/lib/hooks/use-business-insights';
 import { useTodaysCashRegister } from '@/lib/hooks/use-cash-register';
+import { useOutOfStockPreview } from '@/lib/hooks/use-products';
 import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useLiveClock } from '@/lib/hooks/use-live-clock';
@@ -86,6 +87,7 @@ export default function DashboardScreen() {
   const warehouseOptionsQuery = useWarehouseOptions();
   const defaultWarehouseId = warehouseOptionsQuery.data?.[0]?.id ?? null;
   const cashRegisterQuery = useTodaysCashRegister(defaultWarehouseId);
+  const outOfStockQuery = useOutOfStockPreview(6);
 
   const dashboardQuery = useQuery({
     // isPremium in the key so a fresh entitlements load (or a plan change)
@@ -474,6 +476,48 @@ export default function DashboardScreen() {
             )}
           </Pressable>
         )}
+
+        <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+          <View className="mb-3 flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="text-[14px] font-bold text-text dark:text-text-dark">
+                Out of Stock ({formatNumber(outOfStockQuery.data?.total ?? 0)})
+              </Text>
+              <Text className="text-[11px] text-muted dark:text-muted-dark">Products with zero units on hand</Text>
+            </View>
+            {(outOfStockQuery.data?.total ?? 0) > 0 && (
+              <Pressable onPress={() => router.push('/inventory?status=out_of_stock')}>
+                <Text className="text-[12px] font-semibold text-accent-text dark:text-accent-text-dark">View all</Text>
+              </Pressable>
+            )}
+          </View>
+          {(outOfStockQuery.data?.total ?? 0) === 0 ? (
+            <EmptyState compact icon="🎉" title="No products are currently out of stock" />
+          ) : (
+            <View className="gap-2">
+              {(outOfStockQuery.data?.rows ?? []).map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => router.push(`/inventory/${p.id}`)}
+                  className="flex-row items-center justify-between rounded-[10px] border border-border-2 bg-surface-2 px-3 py-2 dark:border-border-2-dark dark:bg-surface-2-dark"
+                >
+                  <View className="min-w-0 flex-1 pr-2">
+                    <Text className="text-[12.5px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <Text className="text-[10.5px] text-muted dark:text-muted-dark" numberOfLines={1}>
+                      {p.sku}
+                      {p.category_name ? ` · ${p.category_name}` : ''}
+                    </Text>
+                  </View>
+                  <Text className="rounded-[6px] bg-red-weak px-1.5 py-px text-[10.5px] font-bold text-red dark:bg-red-weak-dark dark:text-red-dark">
+                    0 in stock
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
 
         {showAnalytics && (
           <>

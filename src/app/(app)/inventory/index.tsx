@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import Papa from 'papaparse';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
@@ -52,8 +52,14 @@ const STATUS_FILTERS: { key: ProductStatus | 'all'; label: string }[] = [
 // (Inventra/components/inventory/InventoryTabs.tsx's sub-nav, flattened).
 export default function InventoryScreen() {
   const queryClient = useQueryClient();
+  // Lets the Dashboard's "Out of Stock" card deep-link straight into this
+  // list pre-filtered, e.g. router.push('/inventory?status=out_of_stock')
+  // — read once at mount, same as a URL param on web's equivalent page.
+  const { status: initialStatus } = useLocalSearchParams<{ status?: string }>();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<ProductStatus | 'all'>(
+    initialStatus === 'in_stock' || initialStatus === 'low_stock' || initialStatus === 'out_of_stock' ? initialStatus : 'all',
+  );
   const [showFilters, setShowFilters] = useState(false);
   const [importing, setImporting] = useState(false);
   const [categoryId, setCategoryId] = useState('');

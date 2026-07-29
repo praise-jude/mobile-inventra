@@ -79,6 +79,44 @@ export function useProducts(filters: ProductsFilters) {
   });
 }
 
+export interface OutOfStockPreview {
+  rows: ProductSearchRow[];
+  total: number;
+}
+
+// Dashboard-card preview — same search_products() RPC as useProducts,
+// just a plain (non-infinite) query capped to a small limit. total comes
+// from the RPC's own total_count column (same value the Inventory list's
+// "Out of stock" filter would page through), not a second query.
+export function useOutOfStockPreview(limit = 6) {
+  return useQuery({
+    queryKey: ['out-of-stock-preview', limit],
+    queryFn: async (): Promise<OutOfStockPreview> => {
+      const { data, error } = await supabase.rpc('search_products', {
+        p_search: null,
+        p_category_id: null,
+        p_warehouse_id: null,
+        p_supplier_id: null,
+        p_status: 'out_of_stock',
+        p_active: true,
+        p_min_price: null,
+        p_max_price: null,
+        p_min_margin_pct: null,
+        p_max_margin_pct: null,
+        p_expiry_from: null,
+        p_expiry_to: null,
+        p_created_from: null,
+        p_created_to: null,
+        p_limit: limit,
+        p_offset: 0,
+      });
+      if (error) throw new Error('Could not load out-of-stock products.');
+      const rows = (data ?? []) as (ProductSearchRow & { total_count: number })[];
+      return { rows, total: rows[0]?.total_count ?? 0 };
+    },
+  });
+}
+
 export function useProduct(id: string | null) {
   return useQuery({
     queryKey: ['product', id],
