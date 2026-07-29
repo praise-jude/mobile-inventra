@@ -4,8 +4,10 @@ import { useState } from 'react';
 import { Linking, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { logAudit } from '@/lib/actions/audit';
 import { notifyAlert } from '@/lib/confirm';
 import { haptics } from '@/lib/haptics';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
 
 // Mirrors Inventra/components/support/SupportClient.tsx's contact values,
 // but actually launches the device's mail/WhatsApp app on tap (mailto: /
@@ -35,6 +37,7 @@ const CONTACTS = [
 ] as const;
 
 export default function SupportScreen() {
+  const profileQuery = useMyProfile();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [openingId, setOpeningId] = useState<string | null>(null);
 
@@ -57,6 +60,20 @@ export default function SupportScreen() {
       }
       haptics.tap();
       await Linking.openURL(url);
+
+      const profile = profileQuery.data;
+      if (profile) {
+        void logAudit({
+          orgId: profile.org_id,
+          actorId: profile.id,
+          actorName: `${profile.first_name} ${profile.last_name}`,
+          actorRole: profile.role,
+          action: 'support.contacted',
+          module: 'Support',
+          entityType: 'contact_method',
+          entityLabel: contact.label,
+        });
+      }
     } catch {
       haptics.warning();
       notifyAlert('Error', `Could not open ${contact.label.toLowerCase()}. Please try again.`);
