@@ -52,6 +52,7 @@ export default function AppTabs() {
       <NativeTabs.Trigger name="team" hidden />
       <NativeTabs.Trigger name="customers" hidden />
       <NativeTabs.Trigger name="expenses" hidden />
+      <NativeTabs.Trigger name="cash-register" hidden />
       <NativeTabs.Trigger name="invoices" hidden />
       <NativeTabs.Trigger name="support" hidden />
       <NativeTabs.Trigger name="ask-ai" hidden />

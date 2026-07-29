@@ -148,6 +148,33 @@ export type Warehouse = {
   created_at: string;
 };
 
+export type CashRegisterStatus = 'open' | 'closed';
+
+export type DailyCashRegister = {
+  id: string;
+  org_id: string;
+  warehouse_id: string;
+  business_date: string;
+  status: CashRegisterStatus;
+  money_at_hand: number;
+  money_in_purse: number;
+  opening_balance: number;
+  cash_sales: number | null;
+  other_cash_income: number;
+  cash_expenses: number;
+  cash_withdrawals: number;
+  expected_closing_balance: number | null;
+  actual_cash_count: number | null;
+  difference: number | null;
+  notes: string | null;
+  opened_by: string | null;
+  opened_at: string;
+  closed_by: string | null;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DebtorStatus = 'pending' | 'partially_paid' | 'paid' | 'overdue' | 'cancelled';
 
 // See Inventra/supabase/migrations/20260708120500_debtors_expenses.sql.
@@ -688,6 +715,13 @@ export type Database = {
         Warehouse,
         Omit<Warehouse, 'id' | 'created_at' | 'status'> & { id?: string; status?: WarehouseStatus },
         Partial<Omit<Warehouse, 'id' | 'org_id' | 'created_at'>>
+      >;
+      daily_cash_registers: TableDef<
+        DailyCashRegister,
+        Pick<DailyCashRegister, 'org_id' | 'warehouse_id' | 'business_date' | 'money_at_hand' | 'money_in_purse' | 'opening_balance'> & {
+          opened_by?: string | null;
+        },
+        Partial<Omit<DailyCashRegister, 'id' | 'org_id' | 'warehouse_id' | 'created_at'>>
       >;
       customers: TableDef<Customer, Omit<Customer, 'id' | 'created_at'> & { id?: string }, never>;
       debtors: TableDef<

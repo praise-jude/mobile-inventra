@@ -21,6 +21,10 @@ const ALWAYS_ROWS = [
   { href: '/settings/appearance' as const, icon: '🎨', label: 'Appearance', description: 'Light, dark, or match your device' },
   { href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' },
   { href: '/support' as const, icon: '💬', label: 'Contact support', description: 'Email or WhatsApp us directly' },
+  // Open to every role (Staff can view today's cash, just not edit/close —
+  // enforced inside the screen itself) — not in MANAGER_ROWS below, which
+  // is hidden from Staff entirely.
+  { href: '/cash-register' as const, icon: '🧮', label: 'Cash Register', description: "Opening float, today's cash position, and close-of-day" },
 ];
 // Invoices matches Sidebar.tsx's `hideForWarehouse` scope on web (every
 // role except Warehouse can create one) — broader than the manager-tier+
@@ -56,6 +60,7 @@ export default function SettingsScreen() {
       | '/settings/appearance'
       | '/settings/security'
       | '/support'
+      | '/cash-register'
       | '/invoices'
       | '/team'
       | '/customers'

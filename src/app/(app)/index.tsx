@@ -16,6 +16,8 @@ import { FreePlanBanner } from '@/components/free-plan-banner';
 import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, pctDelta, timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useBusinessInsights } from '@/lib/hooks/use-business-insights';
+import { useTodaysCashRegister } from '@/lib/hooks/use-cash-register';
+import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
@@ -78,6 +80,12 @@ export default function DashboardScreen() {
   const { session } = useAuth();
   const entitlementsQuery = useEntitlements();
   const isPremium = entitlementsQuery.data?.tier === 'premium';
+
+  // Not premium-gated (unlike the analytics sections below) — cash
+  // reconciliation is core daily operations, not an analytics upsell.
+  const warehouseOptionsQuery = useWarehouseOptions();
+  const defaultWarehouseId = warehouseOptionsQuery.data?.[0]?.id ?? null;
+  const cashRegisterQuery = useTodaysCashRegister(defaultWarehouseId);
 
   const dashboardQuery = useQuery({
     // isPremium in the key so a fresh entitlements load (or a plan change)
@@ -425,6 +433,47 @@ export default function DashboardScreen() {
             </View>
           ))}
         </View>
+
+        {isManagerTier && defaultWarehouseId && (
+          <Pressable
+            onPress={() => router.push('/cash-register')}
+            className="mt-4 flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
+          >
+            <View className="flex-row items-center gap-3">
+              <View
+                className={`h-9 w-9 items-center justify-center rounded-[9px] ${
+                  cashRegisterQuery.data?.register?.status === 'open'
+                    ? 'bg-green-weak dark:bg-green-weak-dark'
+                    : 'bg-red-weak dark:bg-red-weak-dark'
+                }`}
+              >
+                <Text className="text-[16px]">🧮</Text>
+              </View>
+              <View>
+                <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">
+                  {cashRegisterQuery.data?.register?.status === 'open'
+                    ? '🟢 Business day open'
+                    : cashRegisterQuery.data?.register?.status === 'closed'
+                      ? '🔴 Business day closed'
+                      : '🔴 Business day not opened'}
+                </Text>
+                <Text className="text-[11px] text-muted dark:text-muted-dark">Cash Register</Text>
+              </View>
+            </View>
+            {cashRegisterQuery.data?.register && (
+              <View className="items-end">
+                <Text className="text-[10px] font-semibold uppercase text-muted dark:text-muted-dark">
+                  {cashRegisterQuery.data.register.status === 'open' ? 'Expected now' : 'Difference'}
+                </Text>
+                <Text className="font-mono text-[14px] font-bold text-text dark:text-text-dark">
+                  {cashRegisterQuery.data.register.status === 'open'
+                    ? formatMoney(cashRegisterQuery.data.register.openingBalance + cashRegisterQuery.data.cashSalesSoFar, org.currency)
+                    : formatMoney(cashRegisterQuery.data.register.difference ?? 0, org.currency)}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        )}
 
         {showAnalytics && (
           <>
