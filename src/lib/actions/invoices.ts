@@ -3,6 +3,7 @@
 // manager-tier+ (matches Debtors' pattern) — customer_invoices_update/delete
 // RLS already enforces this, this just gives a clear error instead of a
 // silent RLS-denied no-op.
+import { logAudit } from '@/lib/actions/audit';
 import { canAddInvoice, UpgradeRequiredError } from '@/lib/entitlements';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -91,6 +92,19 @@ export async function createInvoice(input: InvoiceInput): Promise<string> {
   const { error: itemsError } = await supabase.from('customer_invoice_items').insert(itemRows);
   if (itemsError) throw new Error('The invoice was created, but its line items could not be saved.');
 
+  void logAudit({
+    orgId: profile.org_id,
+    actorId: profile.id,
+    actorName: `${profile.first_name} ${profile.last_name}`,
+    actorRole: profile.role,
+    action: 'invoice.created',
+    module: 'Invoices',
+    entityType: 'customer_invoice',
+    entityId: invoice.id as string,
+    entityLabel: invoiceNumber,
+    newValue: { customerName, total },
+  });
+
   return invoice.id as string;
 }
 
@@ -98,16 +112,43 @@ export async function updateInvoiceStatus(id: string, status: CustomerInvoiceSta
   const profile = await requireProfile();
   requireManagerRole(profile.role);
 
+  const { data: invoice } = await supabase.from('customer_invoices').select('invoice_number').eq('id', id).maybeSingle();
   const { error } = await supabase.from('customer_invoices').update({ status }).eq('id', id);
   if (error) throw new Error('Could not update the invoice status.');
+
+  void logAudit({
+    orgId: profile.org_id,
+    actorId: profile.id,
+    actorName: `${profile.first_name} ${profile.last_name}`,
+    actorRole: profile.role,
+    action: 'invoice.status_changed',
+    module: 'Invoices',
+    entityType: 'customer_invoice',
+    entityId: id,
+    entityLabel: invoice?.invoice_number ?? id,
+    newValue: { status },
+  });
 }
 
 export async function deleteInvoice(id: string): Promise<void> {
   const profile = await requireProfile();
   requireManagerRole(profile.role);
 
+  const { data: invoice } = await supabase.from('customer_invoices').select('invoice_number').eq('id', id).maybeSingle();
   const { error } = await supabase.from('customer_invoices').delete().eq('id', id);
   if (error) throw new Error('Could not delete the invoice.');
+
+  void logAudit({
+    orgId: profile.org_id,
+    actorId: profile.id,
+    actorName: `${profile.first_name} ${profile.last_name}`,
+    actorRole: profile.role,
+    action: 'invoice.deleted',
+    module: 'Invoices',
+    entityType: 'customer_invoice',
+    entityId: id,
+    entityLabel: invoice?.invoice_number ?? id,
+  });
 }
 
 // Cloud Storage archival needs a Google service-account key, which this
