@@ -11,7 +11,7 @@ import { deleteDebtor, recordPayment, updateDebtor, type DebtorInput } from '@/l
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { useDebtorDetail, useDebtorsOverview } from '@/lib/hooks/use-debtors';
+import { useDebtorDetail, useDebtorsTotals } from '@/lib/hooks/use-debtors';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 import { isAdminRole } from '@/lib/roles';
@@ -24,7 +24,7 @@ export default function CustomerDetailScreen() {
   const profileQuery = useMyProfile();
   const currency = useOrgCurrency();
   const query = useDebtorDetail(id ?? null);
-  const overviewQuery = useDebtorsOverview();
+  const totalsQuery = useDebtorsTotals();
   const canDelete = isAdminRole(profileQuery.data?.role ?? '');
 
   const [editing, setEditing] = useState(false);
@@ -124,15 +124,16 @@ export default function CustomerDetailScreen() {
   // Gold/Silver tier is ranked against the org's own other customers'
   // amount owed (not a hardcoded currency figure, which wouldn't mean the
   // same thing across currencies) — the same basis the list screen's
-  // "high value" segment uses, so the two stay consistent.
-  const amounts = (overviewQuery.data?.debtors ?? []).map((d) => d.amountOwed).filter((a) => a > 0);
+  // "high value" segment uses, so the two stay consistent. Thresholds now
+  // come from useDebtorsTotals()'s lightweight scan instead of this
+  // screen fetching every debtor itself just to rank one.
   let tier: { label: string; icon: string; className: string } = { label: 'Bronze', icon: '🥉', className: 'text-muted dark:text-muted-dark bg-border-2 dark:bg-border-2-dark' };
-  if (amounts.length >= 3) {
-    const sorted = [...amounts].sort((a, b) => b - a);
-    const gold = sorted[Math.max(0, Math.floor(sorted.length * 0.1) - 1)];
-    const silver = sorted[Math.max(0, Math.floor(sorted.length * 0.4) - 1)];
-    if (debtor.lifetimeValue >= gold) tier = { label: 'Gold', icon: '🥇', className: 'text-amber dark:text-amber-dark bg-amber-weak dark:bg-amber-weak-dark' };
-    else if (debtor.lifetimeValue >= silver) tier = { label: 'Silver', icon: '🥈', className: 'text-text-2 dark:text-text-2-dark bg-surface-2 dark:bg-surface-2-dark' };
+  const gold = totalsQuery.data?.goldThreshold;
+  const silver = totalsQuery.data?.silverThreshold;
+  if (gold !== null && gold !== undefined && debtor.lifetimeValue >= gold) {
+    tier = { label: 'Gold', icon: '🥇', className: 'text-amber dark:text-amber-dark bg-amber-weak dark:bg-amber-weak-dark' };
+  } else if (silver !== null && silver !== undefined && debtor.lifetimeValue >= silver) {
+    tier = { label: 'Silver', icon: '🥈', className: 'text-text-2 dark:text-text-2-dark bg-surface-2 dark:bg-surface-2-dark' };
   }
 
   return (

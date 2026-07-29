@@ -10,7 +10,8 @@ import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
-import { segmentFor, useDebtorsOverview, type CustomerSegment, type DebtorRow } from '@/lib/hooks/use-debtors';
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { useDebtorsList, useDebtorsTotals, type CustomerSegment, type DebtorRow } from '@/lib/hooks/use-debtors';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 
@@ -33,25 +34,22 @@ const SEGMENT_FILTERS: { key: CustomerSegment | ''; label: string }[] = [
 // Mirrors Inventra/components/debtors/DebtorsClient.tsx — Sidebar.tsx labels
 // this nav item "Customers" though the table/module is "Debtors" (credit
 // tracking), same "DB name stays, UI label changes" pattern as Warehouses/
-// Branches.
+// Branches. List is server-paginated (useDebtorsList) same as Inventory's
+// useProducts, not a client-side filter over one unbounded fetch anymore.
 export default function CustomersScreen() {
   const currency = useOrgCurrency();
-  const query = useDebtorsOverview();
   const entitlementsQuery = useEntitlements();
   const isPremium = entitlementsQuery.data?.tier === 'premium';
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [segmentFilter, setSegmentFilter] = useState<CustomerSegment | ''>('');
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const rows = query.data?.debtors ?? [];
-    const amounts = rows.map((d) => d.amountOwed).filter((a) => a > 0);
-    return rows.filter((d) => {
-      if (q && !d.customerName.toLowerCase().includes(q)) return false;
-      if (segmentFilter && segmentFor(d, amounts) !== segmentFilter) return false;
-      return true;
-    });
-  }, [query.data, search, segmentFilter]);
+  const totalsQuery = useDebtorsTotals();
+  const listQuery = useDebtorsList(
+    { search: debouncedSearch, segment: segmentFilter },
+    totalsQuery.data?.highValueThreshold ?? null,
+  );
+  const debtors = useMemo(() => listQuery.data?.pages.flatMap((p) => p.rows) ?? [], [listQuery.data]);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -65,24 +63,24 @@ export default function CustomersScreen() {
 
       {entitlementsQuery.data && !isPremium ? (
         <PremiumLockedState feature="Customer management" />
-      ) : query.isLoading ? (
+      ) : totalsQuery.isLoading || listQuery.isLoading ? (
         <View className="gap-2.5 p-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />
           ))}
         </View>
-      ) : query.isError ? (
-        <ErrorState onRetry={() => query.refetch()} />
+      ) : totalsQuery.isError || listQuery.isError ? (
+        <ErrorState onRetry={() => (totalsQuery.isError ? totalsQuery.refetch() : listQuery.refetch())} />
       ) : (
         <>
           <View className="flex-row flex-wrap gap-2.5 p-4 pb-0">
             <View className="min-w-[45%] flex-1 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[11px] text-muted dark:text-muted-dark">Outstanding</Text>
-              <Text className="text-[17px] font-bold text-text dark:text-text-dark">{formatMoney(query.data!.totalOutstanding, currency)}</Text>
+              <Text className="text-[17px] font-bold text-text dark:text-text-dark">{formatMoney(totalsQuery.data!.totalOutstanding, currency)}</Text>
             </View>
             <View className="min-w-[45%] flex-1 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[11px] text-muted dark:text-muted-dark">Overdue</Text>
-              <Text className="text-[17px] font-bold text-red dark:text-red-dark">{formatMoney(query.data!.overdueAmount, currency)}</Text>
+              <Text className="text-[17px] font-bold text-red dark:text-red-dark">{formatMoney(totalsQuery.data!.overdueAmount, currency)}</Text>
             </View>
           </View>
 
@@ -116,15 +114,19 @@ export default function CustomersScreen() {
             })}
           </View>
 
-          {filtered.length === 0 ? (
+          {debtors.length === 0 ? (
             <EmptyState icon="💵" title="No customers" description="Track a customer's credit balance to see them here." />
           ) : (
             <FlatList
-              data={filtered}
+              data={debtors}
               keyExtractor={(d) => d.id}
               {...FLATLIST_PERF_PROPS}
               contentContainerClassName="gap-2 px-4 pb-6"
-              refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
+              refreshControl={<RefreshControl refreshing={listQuery.isRefetching} onRefresh={() => listQuery.refetch()} />}
+              onEndReached={() => {
+                if (listQuery.hasNextPage) void listQuery.fetchNextPage();
+              }}
+              onEndReachedThreshold={0.4}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => router.push(`/customers/${item.id}`)}

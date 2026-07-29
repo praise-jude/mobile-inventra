@@ -9,7 +9,8 @@ import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
-import { useInvoicesOverview, type InvoiceRow } from '@/lib/hooks/use-invoices';
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { useInvoicesList, useInvoicesTotals, type InvoiceRow } from '@/lib/hooks/use-invoices';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 
 const STATUS_STYLE: Record<InvoiceRow['status'], { label: string; className: string }> = {
@@ -20,18 +21,16 @@ const STATUS_STYLE: Record<InvoiceRow['status'], { label: string; className: str
   void: { label: 'Void', className: 'text-muted dark:text-muted-dark bg-border-2 dark:bg-border-2-dark' },
 };
 
-// Mirrors Inventra/components/invoices/InvoicesClient.tsx.
+// Mirrors Inventra/components/invoices/InvoicesClient.tsx. List is
+// server-paginated (useInvoicesList) same as Inventory/Customers, not a
+// client-side filter over one unbounded fetch anymore.
 export default function InvoicesScreen() {
   const currency = useOrgCurrency();
-  const query = useInvoicesOverview();
+  const totalsQuery = useInvoicesTotals();
   const [search, setSearch] = useState('');
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const rows = query.data?.invoices ?? [];
-    if (!q) return rows;
-    return rows.filter((i) => i.customerName.toLowerCase().includes(q) || i.invoiceNumber.toLowerCase().includes(q));
-  }, [query.data, search]);
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const listQuery = useInvoicesList({ search: debouncedSearch });
+  const invoices = useMemo(() => listQuery.data?.pages.flatMap((p) => p.rows) ?? [], [listQuery.data]);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -43,24 +42,24 @@ export default function InvoicesScreen() {
         <View className="w-12" />
       </View>
 
-      {query.isLoading ? (
+      {totalsQuery.isLoading || listQuery.isLoading ? (
         <View className="gap-2.5 p-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />
           ))}
         </View>
-      ) : query.isError ? (
-        <ErrorState onRetry={() => query.refetch()} />
+      ) : totalsQuery.isError || listQuery.isError ? (
+        <ErrorState onRetry={() => (totalsQuery.isError ? totalsQuery.refetch() : listQuery.refetch())} />
       ) : (
         <>
           <View className="flex-row flex-wrap gap-2.5 p-4 pb-0">
             <View className="min-w-[45%] flex-1 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[11px] text-muted dark:text-muted-dark">Outstanding</Text>
-              <Text className="text-[17px] font-bold text-text dark:text-text-dark">{formatMoney(query.data!.totalOutstanding, currency)}</Text>
+              <Text className="text-[17px] font-bold text-text dark:text-text-dark">{formatMoney(totalsQuery.data!.totalOutstanding, currency)}</Text>
             </View>
             <View className="min-w-[45%] flex-1 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[11px] text-muted dark:text-muted-dark">Overdue</Text>
-              <Text className="text-[17px] font-bold text-red dark:text-red-dark">{query.data!.overdueCount}</Text>
+              <Text className="text-[17px] font-bold text-red dark:text-red-dark">{totalsQuery.data!.overdueCount}</Text>
             </View>
           </View>
 
@@ -77,15 +76,19 @@ export default function InvoicesScreen() {
             </Button>
           </View>
 
-          {filtered.length === 0 ? (
+          {invoices.length === 0 ? (
             <EmptyState icon="📄" title="No invoices" description="Create an invoice to bill a customer for goods or services." />
           ) : (
             <FlatList
-              data={filtered}
+              data={invoices}
               keyExtractor={(i) => i.id}
               {...FLATLIST_PERF_PROPS}
               contentContainerClassName="gap-2 px-4 pb-6"
-              refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
+              refreshControl={<RefreshControl refreshing={listQuery.isRefetching} onRefresh={() => listQuery.refetch()} />}
+              onEndReached={() => {
+                if (listQuery.hasNextPage) void listQuery.fetchNextPage();
+              }}
+              onEndReachedThreshold={0.4}
               renderItem={({ item }) => (
                 <Pressable
                   onPress={() => router.push(`/invoices/${item.id}`)}

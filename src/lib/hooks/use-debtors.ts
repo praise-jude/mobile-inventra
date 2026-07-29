@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 import type { DebtorStatus } from '@/types/database';
+
+const PAGE_SIZE = 25;
 
 // Nothing in the DB flips a debtor to 'overdue' when its due_date passes —
 // derive it at read time, mirroring Inventra/lib/queries/debtors.ts's
@@ -27,68 +29,149 @@ export interface DebtorRow {
   createdAt: string;
 }
 
-export interface DebtorsOverview {
+export interface DebtorsTotals {
   totalOutstanding: number;
   totalPaid: number;
   overdueAmount: number;
   debtorCount: number;
-  debtors: DebtorRow[];
+  // Top-20%-by-amount-owed cutoff across every debtor in the org — same
+  // basis segmentFor() below already used when everything was loaded at
+  // once. Computed here (from a lightweight amount_owed-only scan) so the
+  // "High value" segment filter can still be expressed as a single
+  // .gte(amount_owed, threshold) on the paginated query, without needing
+  // every debtor loaded client-side to know where that cutoff falls.
+  highValueThreshold: number | null;
+  // Top-10%/top-40% cutoffs for customers/[id].tsx's Gold/Silver/Bronze
+  // loyalty badge — same three-percentile split it used to compute itself
+  // from a full useDebtorsOverview() fetch; now sourced from this same
+  // lightweight scan instead of a second unbounded one.
+  goldThreshold: number | null;
+  silverThreshold: number | null;
 }
 
-// Mirrors Inventra/lib/queries/debtors.ts's getDebtorsOverview.
-export function useDebtorsOverview() {
+// Was folded into one unbounded useDebtorsOverview() fetch — split so the
+// summary cards (which must reflect every debtor, not just a loaded page)
+// and the actual list (now paginated, see useDebtorsList below) can be
+// independent queries. Mirrors Inventra/lib/queries/debtors.ts's split
+// between its totals scan and its paginated row query.
+export function useDebtorsTotals() {
   return useQuery({
-    queryKey: ['debtors-overview'],
-    queryFn: async (): Promise<DebtorsOverview> => {
-      const [{ data: debtors, error: debError }, { data: totalPaidRaw, error: payError }] = await Promise.all([
-        supabase
-          .from('debtors')
-          .select('id, customer_name, phone, email, notes, amount_owed, due_date, status, created_at')
-          .order('created_at', { ascending: false }),
+    queryKey: ['debtors-totals'],
+    queryFn: async (): Promise<DebtorsTotals> => {
+      const [{ data: rows, error: debError }, { data: totalPaidRaw, error: payError }] = await Promise.all([
+        supabase.from('debtors').select('amount_owed, status, due_date'),
         supabase.rpc('get_debtor_payments_total'),
       ]);
       if (debError) throw new Error('Could not load debtors.');
       if (payError) throw new Error('Could not load debtors.');
 
-      const rows = (debtors ?? []).map((d) => ({ ...d, status: effectiveStatus(d.status, d.due_date) }));
-      const totalOutstanding = rows.filter((d) => d.status !== 'cancelled').reduce((s, d) => s + Number(d.amount_owed), 0);
-      const overdueAmount = rows.filter((d) => d.status === 'overdue').reduce((s, d) => s + Number(d.amount_owed), 0);
+      const withStatus = (rows ?? []).map((d) => ({ ...d, status: effectiveStatus(d.status, d.due_date) }));
+      const totalOutstanding = withStatus.filter((d) => d.status !== 'cancelled').reduce((s, d) => s + Number(d.amount_owed), 0);
+      const overdueAmount = withStatus.filter((d) => d.status === 'overdue').reduce((s, d) => s + Number(d.amount_owed), 0);
+
+      const amounts = withStatus.map((d) => Number(d.amount_owed)).filter((a) => a > 0);
+      let highValueThreshold: number | null = null;
+      let goldThreshold: number | null = null;
+      let silverThreshold: number | null = null;
+      if (amounts.length >= 3) {
+        const sorted = [...amounts].sort((a, b) => b - a);
+        highValueThreshold = sorted[Math.max(0, Math.floor(sorted.length * 0.2) - 1)];
+        goldThreshold = sorted[Math.max(0, Math.floor(sorted.length * 0.1) - 1)];
+        silverThreshold = sorted[Math.max(0, Math.floor(sorted.length * 0.4) - 1)];
+      }
 
       return {
         totalOutstanding,
         totalPaid: Number(totalPaidRaw ?? 0),
         overdueAmount,
-        debtorCount: rows.length,
-        debtors: rows.map((d) => ({
-          id: d.id,
-          customerName: d.customer_name,
-          phone: d.phone,
-          email: d.email,
-          notes: d.notes,
-          amountOwed: Number(d.amount_owed),
-          dueDate: d.due_date,
-          status: d.status,
-          createdAt: d.created_at,
-        })),
+        debtorCount: withStatus.length,
+        highValueThreshold,
+        goldThreshold,
+        silverThreshold,
       };
     },
   });
 }
 
-// Segments each debtor relative to the rest of the org's own list (not a
-// hardcoded currency amount, since that wouldn't mean the same thing for
-// an org billing in NGN vs one billing in USD) — top 20% by amount owed is
-// "high value", everything else falls through status/recency rules.
-export function segmentFor(debtor: DebtorRow, allAmounts: number[]): CustomerSegment {
+export interface DebtorsListFilters {
+  search?: string;
+  status?: DebtorStatus;
+  segment?: CustomerSegment | '';
+}
+
+// segmentFor() used to classify a row against every other loaded debtor —
+// now that rows are paginated, "New" and "Paid up" translate to a direct
+// column filter, "Overdue" mirrors effectiveStatus's own rule, and "High
+// value" needs the org-wide threshold useDebtorsTotals() computed (passed
+// in rather than recomputed here, so the two queries agree on one number).
+// "Standard" (the catch-all bucket) isn't offered as a filter chip in the
+// UI, so it isn't implemented as a query — same as before this change.
+export function useDebtorsList(filters: DebtorsListFilters, highValueThreshold: number | null) {
+  const needsThreshold = filters.segment === 'high_value';
+  return useInfiniteQuery({
+    queryKey: ['debtors-list', filters, highValueThreshold],
+    queryFn: async ({ pageParam }) => {
+      const from = pageParam * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('debtors')
+        .select('id, customer_name, phone, email, notes, amount_owed, due_date, status, created_at', { count: 'exact' })
+        .order('created_at', { ascending: false });
+
+      if (filters.search?.trim()) {
+        const q = filters.search.trim().replace(/[%_]/g, '');
+        query = query.or(`customer_name.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
+      }
+      if (filters.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters.segment === 'overdue') {
+        const today = new Date().toISOString().slice(0, 10);
+        query = query.in('status', ['pending', 'partially_paid']).lt('due_date', today);
+      } else if (filters.segment === 'paid_up') {
+        query = query.eq('status', 'paid');
+      } else if (filters.segment === 'new') {
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        query = query.gte('created_at', since);
+      } else if (filters.segment === 'high_value' && highValueThreshold !== null) {
+        query = query.gte('amount_owed', highValueThreshold);
+      }
+
+      const { data, error, count } = await query.range(from, to);
+      if (error) throw new Error('Could not load debtors.');
+
+      const rows: DebtorRow[] = (data ?? []).map((d) => ({
+        id: d.id,
+        customerName: d.customer_name,
+        phone: d.phone,
+        email: d.email,
+        notes: d.notes,
+        amountOwed: Number(d.amount_owed),
+        dueDate: d.due_date,
+        status: effectiveStatus(d.status, d.due_date),
+        createdAt: d.created_at,
+      }));
+      return { rows, total: count ?? 0, page: pageParam };
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const loaded = (lastPage.page + 1) * PAGE_SIZE;
+      return loaded < lastPage.total ? lastPage.page + 1 : undefined;
+    },
+    enabled: !needsThreshold || highValueThreshold !== null,
+  });
+}
+
+// Retained for anywhere still classifying an already-loaded row against a
+// known threshold (e.g. a detail screen) — the org-wide-scan version this
+// used to do alone now lives in useDebtorsTotals.
+export function segmentFor(debtor: DebtorRow, highValueThreshold: number | null): CustomerSegment {
   if (debtor.status === 'overdue') return 'overdue';
   if (debtor.status === 'paid') return 'paid_up';
   const isNew = Date.now() - new Date(debtor.createdAt).getTime() < 30 * 24 * 60 * 60 * 1000;
   if (isNew) return 'new';
-  if (allAmounts.length >= 3) {
-    const sorted = [...allAmounts].sort((a, b) => b - a);
-    const top20Threshold = sorted[Math.max(0, Math.floor(sorted.length * 0.2) - 1)];
-    if (debtor.amountOwed > 0 && debtor.amountOwed >= top20Threshold) return 'high_value';
-  }
+  if (highValueThreshold !== null && debtor.amountOwed > 0 && debtor.amountOwed >= highValueThreshold) return 'high_value';
   return 'standard';
 }
 

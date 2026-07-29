@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { supabase } from '@/lib/supabase';
 import type { CustomerInvoiceStatus } from '@/types/database';
+
+const PAGE_SIZE = 25;
 
 export interface InvoiceRow {
   id: string;
@@ -13,25 +15,24 @@ export interface InvoiceRow {
   total: number;
 }
 
-export interface InvoicesOverview {
+export interface InvoicesTotals {
   totalOutstanding: number;
   totalPaid: number;
   overdueCount: number;
   invoiceCount: number;
-  invoices: InvoiceRow[];
 }
 
 const OUTSTANDING_STATUSES: CustomerInvoiceStatus[] = ['sent', 'overdue'];
 
-// Mirrors Inventra/lib/queries/invoices.ts's getInvoicesOverview.
-export function useInvoicesOverview() {
+// Was one unbounded useInvoicesOverview() fetch — split the same way
+// use-debtors.ts's useDebtorsTotals/useDebtorsList were: the summary
+// cards need every invoice's status/total (cheap, two columns), the
+// actual list is paginated separately below.
+export function useInvoicesTotals() {
   return useQuery({
-    queryKey: ['invoices-overview'],
-    queryFn: async (): Promise<InvoicesOverview> => {
-      const { data, error } = await supabase
-        .from('customer_invoices')
-        .select('id, invoice_number, customer_name, status, issue_date, due_date, total')
-        .order('created_at', { ascending: false });
+    queryKey: ['invoices-totals'],
+    queryFn: async (): Promise<InvoicesTotals> => {
+      const { data, error } = await supabase.from('customer_invoices').select('status, total');
       if (error) throw new Error('Could not load invoices.');
 
       const rows = data ?? [];
@@ -41,21 +42,51 @@ export function useInvoicesOverview() {
       const totalPaid = rows.filter((r) => r.status === 'paid').reduce((sum, r) => sum + Number(r.total), 0);
       const overdueCount = rows.filter((r) => r.status === 'overdue').length;
 
-      return {
-        totalOutstanding,
-        totalPaid,
-        overdueCount,
-        invoiceCount: rows.length,
-        invoices: rows.map((r) => ({
-          id: r.id,
-          invoiceNumber: r.invoice_number,
-          customerName: r.customer_name,
-          status: r.status,
-          issueDate: r.issue_date,
-          dueDate: r.due_date,
-          total: Number(r.total),
-        })),
-      };
+      return { totalOutstanding, totalPaid, overdueCount, invoiceCount: rows.length };
+    },
+  });
+}
+
+export interface InvoicesListFilters {
+  search?: string;
+  status?: CustomerInvoiceStatus;
+}
+
+export function useInvoicesList(filters: InvoicesListFilters) {
+  return useInfiniteQuery({
+    queryKey: ['invoices-list', filters],
+    queryFn: async ({ pageParam }) => {
+      const from = pageParam * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase
+        .from('customer_invoices')
+        .select('id, invoice_number, customer_name, status, issue_date, due_date, total', { count: 'exact' })
+        .order('created_at', { ascending: false });
+      if (filters.search?.trim()) {
+        const q = filters.search.trim().replace(/[%_]/g, '');
+        query = query.or(`invoice_number.ilike.%${q}%,customer_name.ilike.%${q}%`);
+      }
+      if (filters.status) query = query.eq('status', filters.status);
+
+      const { data, error, count } = await query.range(from, to);
+      if (error) throw new Error('Could not load invoices.');
+
+      const rows: InvoiceRow[] = (data ?? []).map((r) => ({
+        id: r.id,
+        invoiceNumber: r.invoice_number,
+        customerName: r.customer_name,
+        status: r.status,
+        issueDate: r.issue_date,
+        dueDate: r.due_date,
+        total: Number(r.total),
+      }));
+      return { rows, total: count ?? 0, page: pageParam };
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const loaded = (lastPage.page + 1) * PAGE_SIZE;
+      return loaded < lastPage.total ? lastPage.page + 1 : undefined;
     },
   });
 }
