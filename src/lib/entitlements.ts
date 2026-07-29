@@ -45,8 +45,21 @@ const FAIL_SAFE_FREE: Entitlements = {
 // is where the actual caching lives (React Query), for UI reads. This plain
 // async function is for one-shot checks inside src/lib/actions/*.ts.
 export async function getEntitlements(): Promise<Entitlements> {
-  const { data, error } = await supabase.rpc('get_org_entitlements');
-  if (error || !data) return FAIL_SAFE_FREE;
+  let { data, error } = await supabase.rpc('get_org_entitlements');
+  if (error || !data) {
+    // A single failed call (dropped connection, brief token-refresh race)
+    // used to silently fail the caller to free-tier limits with no
+    // retry and no visibility — that's the right safe default for a
+    // genuine failure, but too eager for a transient one. One retry
+    // after a short delay before accepting the fail-safe.
+    console.error('[Royal Inventra] get_org_entitlements failed, retrying once:', error);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    ({ data, error } = await supabase.rpc('get_org_entitlements'));
+    if (error || !data) {
+      console.error('[Royal Inventra] get_org_entitlements failed twice, falling back to free tier:', error);
+      return FAIL_SAFE_FREE;
+    }
+  }
 
   const d = data as OrgEntitlementsRpc;
   return {
