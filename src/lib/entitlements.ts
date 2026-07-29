@@ -25,20 +25,20 @@ export interface Entitlements {
   invoiceLimit: number;
 }
 
-const FAIL_SAFE_FREE: Entitlements = {
-  orgId: null,
-  tier: 'free',
-  planKey: null,
-  status: null,
-  productCount: 0,
-  productLimit: 20,
-  salesCount: 0,
-  salesLimit: 300,
-  expenseCount: 0,
-  expenseLimit: 10,
-  invoiceCount: 0,
-  invoiceLimit: 10,
-};
+// Thrown when the entitlements RPC couldn't be reached at all (both the
+// original call and the retry failed) — deliberately NOT the same thing
+// as "confirmed free tier". This used to silently collapse into a
+// free-tier fallback object, which meant a real Premium/grandfathered
+// account with a flaky connection would see "Upgrade to Premium"
+// messaging that was simply false — the check never actually ran, it
+// just couldn't complete. Callers should show this message as-is rather
+// than treating it as an upgrade prompt.
+export class EntitlementsUnavailableError extends Error {
+  constructor(message = "Could not verify your subscription status. Check your connection and try again.") {
+    super(message);
+    this.name = 'EntitlementsUnavailableError';
+  }
+}
 
 // No React cache()/request-scoping on mobile (there's no "request" the way
 // there is for a Next.js Server Component) — src/lib/hooks/use-entitlements.ts
@@ -48,16 +48,13 @@ export async function getEntitlements(): Promise<Entitlements> {
   let { data, error } = await supabase.rpc('get_org_entitlements');
   if (error || !data) {
     // A single failed call (dropped connection, brief token-refresh race)
-    // used to silently fail the caller to free-tier limits with no
-    // retry and no visibility — that's the right safe default for a
-    // genuine failure, but too eager for a transient one. One retry
-    // after a short delay before accepting the fail-safe.
+    // shouldn't immediately give up — retry once after a short delay.
     console.error('[Royal Inventra] get_org_entitlements failed, retrying once:', error);
     await new Promise((resolve) => setTimeout(resolve, 800));
     ({ data, error } = await supabase.rpc('get_org_entitlements'));
     if (error || !data) {
-      console.error('[Royal Inventra] get_org_entitlements failed twice, falling back to free tier:', error);
-      return FAIL_SAFE_FREE;
+      console.error('[Royal Inventra] get_org_entitlements failed twice:', error);
+      throw new EntitlementsUnavailableError();
     }
   }
 
@@ -68,13 +65,13 @@ export async function getEntitlements(): Promise<Entitlements> {
     planKey: d.plan_key ?? null,
     status: d.status ?? null,
     productCount: Number(d.product_count ?? 0),
-    productLimit: Number(d.product_limit ?? FAIL_SAFE_FREE.productLimit),
+    productLimit: Number(d.product_limit ?? 20),
     salesCount: Number(d.sales_count ?? 0),
-    salesLimit: Number(d.sales_limit ?? FAIL_SAFE_FREE.salesLimit),
+    salesLimit: Number(d.sales_limit ?? 300),
     expenseCount: Number(d.expense_count ?? 0),
-    expenseLimit: Number(d.expense_limit ?? FAIL_SAFE_FREE.expenseLimit),
+    expenseLimit: Number(d.expense_limit ?? 10),
     invoiceCount: Number(d.invoice_count ?? 0),
-    invoiceLimit: Number(d.invoice_limit ?? FAIL_SAFE_FREE.invoiceLimit),
+    invoiceLimit: Number(d.invoice_limit ?? 10),
   };
 }
 
