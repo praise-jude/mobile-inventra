@@ -9,6 +9,7 @@ import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { Skeleton } from '@/components/skeleton';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
+import { useLogReportView } from '@/lib/hooks/use-log-report-view';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useInventoryValuation } from '@/lib/hooks/use-reports';
 
@@ -16,6 +17,7 @@ import { useInventoryValuation } from '@/lib/hooks/use-reports';
 export default function InventoryValuationScreen() {
   const currency = useOrgCurrency();
   const query = useInventoryValuation();
+  useLogReportView('Inventory Valuation', query.isSuccess);
 
   const totals = useMemo(() => {
     const rows = query.data ?? [];

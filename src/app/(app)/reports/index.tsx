@@ -8,6 +8,7 @@ import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { PRESET_LABELS, rangeForPreset, type DateRangePreset } from '@/lib/date-range';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useLogReportView } from '@/lib/hooks/use-log-report-view';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useSalesReport } from '@/lib/hooks/use-reports';
 
@@ -20,6 +21,7 @@ export default function SalesReportScreen() {
   const currency = useOrgCurrency();
   const range = rangeForPreset(preset);
   const query = useSalesReport({ from: range.from, to: range.to }, range.granularity === 'month' ? 'month' : 'day');
+  useLogReportView('Sales Report', query.isSuccess);
 
   return (
     <ReportsAccessGate>

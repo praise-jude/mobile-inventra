@@ -8,6 +8,7 @@ import { ReportsAccessGate } from '@/components/reports-access-gate';
 import { PRESET_LABELS, rangeForPreset, type DateRangePreset } from '@/lib/date-range';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
+import { useLogReportView } from '@/lib/hooks/use-log-report-view';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useProfitLoss } from '@/lib/hooks/use-reports';
 
@@ -17,6 +18,7 @@ export default function ProfitLossScreen() {
   const currency = useOrgCurrency();
   const range = rangeForPreset(preset);
   const query = useProfitLoss({ from: range.from, to: range.to });
+  useLogReportView('Profit & Loss', query.isSuccess);
 
   return (
     <ReportsAccessGate>
