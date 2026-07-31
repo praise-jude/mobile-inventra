@@ -62,10 +62,20 @@ export function useTeamMembers() {
   // RLS-aware per connection so this only ever receives rows this session
   // could already SELECT (i.e. same-org), same as Inventra/components/
   // team/TeamClient.tsx's channel.
+  // Depend on the user id (a stable primitive), not `session` itself — the
+  // session object gets a new reference on every auth event (token
+  // refresh included, not just sign-in/out), so using it directly as a
+  // dependency re-ran this effect far more often than the user actually
+  // changed. Each re-run recreated a channel with the exact same topic
+  // name before the previous one's async removeChannel() had necessarily
+  // finished tearing down, which Supabase's client surfaces as "cannot
+  // add postgres_changes callbacks... after subscribe()" — the crash
+  // that made this whole screen render blank.
+  const userId = session?.user.id;
   useEffect(() => {
-    if (!session) return;
+    if (!userId) return;
     const channel = supabase
-      .channel(`team:user:${session.user.id}`)
+      .channel(`team:user:${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       })
@@ -74,7 +84,7 @@ export function useTeamMembers() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [session, queryClient]);
+  }, [userId, queryClient]);
 
   return {
     ...query,
