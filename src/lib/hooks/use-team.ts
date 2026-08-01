@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
@@ -71,11 +71,19 @@ export function useTeamMembers() {
   // finished tearing down, which Supabase's client surfaces as "cannot
   // add postgres_changes callbacks... after subscribe()" — the crash
   // that made this whole screen render blank.
+  // useTeamMembers() is called from several screens that can be mounted at
+  // the same time (Dashboard, Team, warehouse forms) — each call needs its
+  // own channel topic, otherwise two concurrent instances both try to
+  // subscribe under the identical `team:user:<id>` topic and the second
+  // one's .subscribe() throws "cannot add postgres_changes callbacks...
+  // after subscribe()", which is what was crashing the Team screen even
+  // after the session-vs-userId dependency fix.
+  const instanceId = useId();
   const userId = session?.user.id;
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
-      .channel(`team:user:${userId}`)
+      .channel(`team:user:${userId}:${instanceId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
         queryClient.invalidateQueries({ queryKey: ['team-members'] });
       })
@@ -84,7 +92,7 @@ export function useTeamMembers() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, queryClient]);
+  }, [userId, queryClient, instanceId]);
 
   return {
     ...query,
