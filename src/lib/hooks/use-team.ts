@@ -15,8 +15,10 @@ export interface TeamMemberRow {
   rejectedAt: string | null;
   rejectedReason: string | null;
   approvedAt: string | null;
+  acceptedAt: string | null;
   initials: string;
   lastActive: string | null;
+  branchId: string | null;
   branchName: string | null;
 }
 
@@ -33,7 +35,7 @@ export function useTeamMembers() {
         // and this table's own branch_id) — PostgREST can't infer which one
         // to embed without the explicit !constraint hint.
         .select(
-          'id, first_name, last_name, email, role, status, suspended_at, rejected_at, rejected_reason, approved_at, last_active_at, warehouses!profiles_branch_id_fkey(name)',
+          'id, first_name, last_name, email, role, status, suspended_at, rejected_at, rejected_reason, approved_at, accepted_at, last_active_at, branch_id, warehouses!profiles_branch_id_fkey(name)',
         )
         .order('created_at', { ascending: true });
       if (error) throw new Error('Could not load team members. Please try again.');
@@ -48,8 +50,10 @@ export function useTeamMembers() {
         rejectedAt: p.rejected_at ?? null,
         rejectedReason: p.rejected_reason ?? null,
         approvedAt: p.approved_at ?? null,
+        acceptedAt: p.accepted_at ?? null,
         initials: `${p.first_name[0] ?? ''}${p.last_name[0] ?? ''}`.toUpperCase(),
         lastActive: p.last_active_at,
+        branchId: p.branch_id ?? null,
         branchName: (p.warehouses as unknown as { name: string } | null)?.name ?? null,
       }));
     },

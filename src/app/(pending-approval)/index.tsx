@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/actions/auth';
 import { useAuth } from '@/lib/auth-context';
+import { timeAgo } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { supabase } from '@/lib/supabase';
 
@@ -12,6 +13,7 @@ interface PendingApprovalInfo {
   orgName: string;
   branchName: string | null;
   invitedByName: string | null;
+  acceptedAt: string | null;
 }
 
 // Mirrors Inventra's app/pending-approval/page.tsx — shown while
@@ -24,7 +26,7 @@ function usePendingApprovalInfo() {
     queryFn: async (): Promise<PendingApprovalInfo> => {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('org_id, branch_id, invited_by')
+        .select('org_id, branch_id, invited_by, accepted_at')
         .eq('id', session!.user.id)
         .single();
       if (!profile) throw new Error('No profile');
@@ -41,6 +43,7 @@ function usePendingApprovalInfo() {
         orgName: orgRes.data?.name ?? 'your workspace',
         branchName: branchRes.data?.name ?? null,
         invitedByName: inviterRes.data ? `${inviterRes.data.first_name} ${inviterRes.data.last_name}` : null,
+        acceptedAt: profile.accepted_at ?? null,
       };
     },
     enabled: !!session,
@@ -76,6 +79,7 @@ export default function PendingApprovalScreen() {
                   <Text className="text-[11px] font-bold text-sky dark:text-sky-dark">Awaiting approval</Text>
                 </View>
               </View>
+              {infoQuery.data?.acceptedAt && <InfoRow label="Waiting since" value={timeAgo(infoQuery.data.acceptedAt)} />}
             </>
           )}
         </View>

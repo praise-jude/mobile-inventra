@@ -65,6 +65,7 @@ export type Profile = {
   rejected_reason: string | null;
   approved_by: string | null;
   approved_at: string | null;
+  accepted_at: string | null;
   invited_by: string | null;
   created_at: string;
 };

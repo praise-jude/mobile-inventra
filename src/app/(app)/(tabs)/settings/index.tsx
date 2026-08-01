@@ -7,6 +7,7 @@ import { signOut } from '@/lib/actions/auth';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
+import { useTeamMembers } from '@/lib/hooks/use-team';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 
 // Security (MFA) is every role's own account setting, unconditional —
@@ -55,6 +56,20 @@ export default function SettingsScreen() {
 
   const isWarehouse = profileQuery.data?.role === 'warehouse';
 
+  // Only fetched for the Team row's pending-approvals pill — mirrors
+  // (tabs)/index.tsx's Dashboard card scoping exactly (Owner/Admin see the
+  // whole org's queue, a Manager only their own branch's).
+  const teamMembersQuery = useTeamMembers();
+  const profile = profileQuery.data;
+  const pendingApprovalsCount =
+    isManagerUp && profile
+      ? (teamMembersQuery.data ?? []).filter(
+          (m) =>
+            m.status === 'awaiting_approval' &&
+            (isAdmin || (profile.role === 'manager' && !!profile.branch_id && m.branchId === profile.branch_id)),
+        ).length
+      : 0;
+
   function Row(row: {
     href:
       | '/settings/appearance'
@@ -74,6 +89,7 @@ export default function SettingsScreen() {
     icon: string;
     label: string;
     description: string;
+    badge?: number;
   }) {
     return (
       <Pressable
@@ -91,6 +107,11 @@ export default function SettingsScreen() {
           <Text className="text-[14px] font-semibold text-text dark:text-text-dark">{row.label}</Text>
           <Text className="text-[11.5px] text-muted dark:text-muted-dark">{row.description}</Text>
         </View>
+        {!!row.badge && row.badge > 0 && (
+          <View className="rounded-[20px] bg-sky-weak px-1.5 py-px dark:bg-sky-weak-dark">
+            <Text className="font-mono text-[10.5px] font-bold text-sky dark:text-sky-dark">{row.badge}</Text>
+          </View>
+        )}
         <Text className="text-text-2 dark:text-text-2-dark">›</Text>
       </Pressable>
     );
@@ -105,7 +126,8 @@ export default function SettingsScreen() {
         <View className="mt-6 gap-2.5">
           {ALWAYS_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {!isWarehouse && SALES_ROWS.map((row) => <Row key={row.href} {...row} />)}
-          {isManagerUp && MANAGER_ROWS.map((row) => <Row key={row.href} {...row} />)}
+          {isManagerUp &&
+            MANAGER_ROWS.map((row) => <Row key={row.href} {...row} badge={row.href === '/team' ? pendingApprovalsCount : undefined} />)}
           {isAdmin && ADMIN_ROWS.map((row) => <Row key={row.href} {...row} />)}
         </View>
 

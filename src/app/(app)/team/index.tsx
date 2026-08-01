@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth-context';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { haptics } from '@/lib/haptics';
+import { timeAgo } from '@/lib/format';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useTeamMembers, type TeamMemberRow } from '@/lib/hooks/use-team';
@@ -221,6 +222,9 @@ export default function TeamScreen() {
                     </View>
                     <Text className="text-[11.5px] text-text-2 dark:text-text-2-dark">{m.branchName ?? 'No branch'}</Text>
                   </View>
+                  {status === 'awaiting_approval' && m.acceptedAt && (
+                    <Text className="mt-1 text-[10.5px] text-muted dark:text-muted-dark">Waiting {timeAgo(m.acceptedAt)}</Text>
+                  )}
                 </Pressable>
               );
             }}
