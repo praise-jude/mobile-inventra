@@ -9,11 +9,16 @@ import { haptics } from '@/lib/haptics';
 import { useOrgSettings } from '@/lib/hooks/use-settings';
 import type { NotificationSettings } from '@/types/database';
 
-const ROWS: { key: keyof Omit<NotificationSettings, 'org_id'>; label: string; description: string }[] = [
+// large_supply_threshold_amount is numeric (a configurable amount, not a
+// toggle) — deliberately left web-only for now (Settings > Notifications
+// there), so it's excluded from this boolean-switches screen's key union.
+type ToggleKey = keyof Omit<NotificationSettings, 'org_id' | 'large_supply_threshold_amount'>;
+
+const ROWS: { key: ToggleKey; label: string; description: string }[] = [
   { key: 'low_stock', label: 'Low stock alerts', description: 'When a product falls to or below its reorder level' },
   { key: 'out_of_stock', label: 'Out of stock alerts', description: 'When a product runs out entirely' },
   { key: 'expiring_products', label: 'Expiring products', description: 'When stock is within 7 days of its expiry date' },
-  { key: 'new_purchase_orders', label: 'New purchase orders', description: 'When a new purchase order is created' },
+  { key: 'new_purchase_orders', label: 'Supply records', description: 'New, received, verified, or cancelled supply deliveries' },
   { key: 'weekly_digest', label: 'Weekly digest', description: 'A weekly summary of sales and inventory activity' },
 ];
 
@@ -23,7 +28,7 @@ export default function NotificationsSettingsScreen() {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleToggle(key: keyof Omit<NotificationSettings, 'org_id'>, value: boolean) {
+  async function handleToggle(key: ToggleKey, value: boolean) {
     haptics.select();
     setPending(key);
     setError(null);

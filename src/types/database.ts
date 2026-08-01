@@ -234,6 +234,45 @@ export type NotificationSettings = {
   expiring_products: boolean;
   new_purchase_orders: boolean;
   weekly_digest: boolean;
+  large_supply_threshold_amount: number | null;
+};
+
+export type SupplyStatus = 'pending' | 'received' | 'verified' | 'cancelled';
+
+export type SupplyRecord = {
+  id: string;
+  org_id: string;
+  reference_number: string;
+  supplier_id: string | null;
+  supplier_name: string;
+  supplier_phone: string | null;
+  supplier_email: string | null;
+  invoice_number: string | null;
+  warehouse_id: string;
+  date_supplied: string;
+  status: SupplyStatus;
+  total_quantity: number;
+  total_amount: number;
+  notes: string | null;
+  created_by: string | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  cancelled_by: string | null;
+  cancelled_at: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupplyRecordItem = {
+  id: string;
+  org_id: string;
+  supply_record_id: string;
+  product_id: string;
+  quantity: number;
+  unit_cost: number;
+  line_total: number;
+  created_at: string;
 };
 
 // Platform-wide singleton config table, not org-scoped — mirrors
@@ -532,6 +571,7 @@ export type StockMovement = {
   adjustment_type: AdjustmentType | null;
   notes: string | null;
   sale_id: string | null;
+  supply_record_id: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -758,7 +798,15 @@ export type Database = {
         Omit<Expense, 'id' | 'created_at' | 'created_by'> & { id?: string; created_by?: string | null },
         Partial<Omit<Expense, 'id' | 'org_id' | 'created_at' | 'created_by'>>
       >;
-      stock_movements: TableDef<StockMovement, Omit<StockMovement, 'id' | 'created_at'> & { id?: string }, never>;
+      // supply_record_id is optional on insert — every existing call site
+      // (adjustments, product creation, warehouse open-stock, sales) never
+      // sets it, since it's only ever written by the
+      // apply_supply_record_status_change() DB trigger, not app code.
+      stock_movements: TableDef<
+        StockMovement,
+        Omit<StockMovement, 'id' | 'created_at' | 'supply_record_id'> & { id?: string; supply_record_id?: string | null },
+        never
+      >;
       sales: TableDef<Sale, Omit<Sale, 'id' | 'created_at'> & { id?: string }, Partial<Pick<Sale, 'notes'>>>;
       sale_payments: TableDef<SalePayment, Omit<SalePayment, 'id'> & { id?: string }, Partial<Pick<SalePayment, 'method'>>>;
       // actor_id has no DB default (unlike created_by-style columns
@@ -791,6 +839,35 @@ export type Database = {
         },
         Partial<Pick<ApprovalRequestRow, 'status' | 'entity_id' | 'decided_by' | 'decided_at' | 'rejected_reason'>>
       >;
+      supply_records: TableDef<
+        SupplyRecord,
+        Omit<SupplyRecord, 'id' | 'status' | 'verified_by' | 'verified_at' | 'cancelled_by' | 'cancelled_at' | 'deleted_at' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          status?: SupplyStatus;
+        },
+        Partial<
+          Pick<
+            SupplyRecord,
+            | 'supplier_id'
+            | 'supplier_name'
+            | 'supplier_phone'
+            | 'supplier_email'
+            | 'invoice_number'
+            | 'warehouse_id'
+            | 'date_supplied'
+            | 'total_quantity'
+            | 'total_amount'
+            | 'notes'
+            | 'status'
+            | 'verified_by'
+            | 'verified_at'
+            | 'cancelled_by'
+            | 'cancelled_at'
+            | 'deleted_at'
+          >
+        >
+      >;
+      supply_record_items: TableDef<SupplyRecordItem, Omit<SupplyRecordItem, 'id' | 'created_at'> & { id?: string }, never>;
     };
     Views: Record<string, never>;
     Functions: {

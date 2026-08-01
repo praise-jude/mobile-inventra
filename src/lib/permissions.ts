@@ -21,13 +21,17 @@ export async function requirePermission(module: string, action: string): Promise
 export const CUSTOMIZABLE_ROLES = ['manager', 'cashier', 'warehouse'] as const;
 export type CustomizableRole = (typeof CUSTOMIZABLE_ROLES)[number];
 
-export const PERMISSION_MODULES = ['inventory', 'sales', 'reports'] as const;
+export const PERMISSION_MODULES = ['inventory', 'sales', 'reports', 'supply_records'] as const;
 export type PermissionModule = (typeof PERMISSION_MODULES)[number];
 
 export const MODULE_ACTIONS = {
   inventory: ['create', 'edit', 'delete', 'create_movement', 'delete_movement'],
   sales: ['create', 'edit', 'delete'],
   reports: ['view'],
+  // Create/edit are Manager+ only, enforced directly by RLS role checks
+  // (not an override-able has_permission() branch) — only view is
+  // actually configurable, same shape as reports.
+  supply_records: ['view'],
 } as const satisfies Record<PermissionModule, readonly string[]>;
 export type PermissionAction = (typeof MODULE_ACTIONS)[PermissionModule][number];
 
@@ -44,6 +48,7 @@ export const MODULE_LABELS: Record<PermissionModule, string> = {
   inventory: 'Inventory',
   sales: 'Sales',
   reports: 'Reports',
+  supply_records: 'Supply Records',
 };
 
 // Straight port of has_permission()'s fallback branch — what each role can
@@ -53,15 +58,18 @@ export const DEFAULT_PERMISSIONS: Record<CustomizableRole, Record<PermissionModu
     inventory: { create: true, edit: true, delete: true, create_movement: true, delete_movement: true },
     sales: { create: true, edit: true, delete: true },
     reports: { view: true },
+    supply_records: { view: true },
   },
   cashier: {
     inventory: { create: false, edit: false, delete: false, create_movement: true, delete_movement: false },
     sales: { create: true, edit: false, delete: false },
     reports: { view: false },
+    supply_records: { view: false },
   },
   warehouse: {
     inventory: { create: false, edit: false, delete: false, create_movement: true, delete_movement: false },
     sales: { create: false, edit: false, delete: false },
     reports: { view: false },
+    supply_records: { view: false },
   },
 };

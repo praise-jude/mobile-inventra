@@ -35,6 +35,7 @@ const MANAGER_ROWS = [
   { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
   { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
   { href: '/expenses' as const, icon: '💸', label: 'Expenses', description: 'Log rent, salary, transport and other spend' },
+  { href: '/supply-records' as const, icon: '🚛', label: 'Supply Records', description: 'Record deliveries from suppliers and track cost' },
 ];
 const ADMIN_ROWS = [
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
@@ -80,6 +81,7 @@ export default function SettingsScreen() {
       | '/team'
       | '/customers'
       | '/expenses'
+      | '/supply-records'
       | '/settings/general'
       | '/settings/roles'
       | '/settings/notifications'
