@@ -89,11 +89,18 @@ export default function DashboardScreen() {
   const cashRegisterQuery = useTodaysCashRegister(defaultWarehouseId);
   const outOfStockQuery = useOutOfStockPreview(6);
 
-  const dashboardQuery = useQuery({
-    // isPremium in the key so a fresh entitlements load (or a plan change)
-    // refetches with the right showAnalytics closure value below, instead
-    // of being stuck on whatever it was at the very first render.
-    queryKey: ['dashboard', session?.user.id, isPremium],
+  // Split into a fast "core" query (profile/org/top-line KPIs — everything
+  // every tier needs) and a slower "analytics" query (charts/breakdowns,
+  // Manager+Premium only) that only starts once core data AND entitlements
+  // are both known. Previously this was one big query gated on
+  // `!entitlementsQuery.isLoading`, so the ENTIRE dashboard — including the
+  // KPI cards every tier sees — sat behind a blank skeleton until the
+  // entitlements round trip finished, on top of the access-gate/MFA check
+  // that already blocks the whole app before this screen even mounts
+  // (src/app/_layout.tsx's RootNavigator). Decoupling core from
+  // entitlements removes one full serial network phase from cold start.
+  const coreQuery = useQuery({
+    queryKey: ['dashboard-core', session?.user.id],
     queryFn: async () => {
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -110,36 +117,54 @@ export default function DashboardScreen() {
       if (orgError) throw orgError;
 
       const isManagerTier = isManagerRole(profile.role);
-      // Free plan keeps the basic KPI cards (Today's Revenue etc. — role-
-      // gated only via isManagerTier below, unchanged) but loses the actual
-      // charts/trends/breakdowns, same split as Inventra/app/(app)/dashboard/page.tsx.
-      const showAnalytics = isManagerTier && isPremium;
 
-      const [kpisRes, topSellersRes, stockHealthRes, activityRes, categoryMixRes, revenueProfitRes, salesVolumeRes, dailyProfitRes, expensesRes] =
-        await Promise.all([
-          supabase.rpc('get_kpis'),
-          supabase.rpc('get_top_sellers', { p_limit: 5 }),
-          supabase.rpc('get_stock_health'),
-          supabase
-            .from('stock_movements')
-            .select('id, type, qty_delta, reason, created_at, products(name), profiles(first_name, last_name)')
-            .order('created_at', { ascending: false })
-            .limit(5),
-          showAnalytics ? supabase.rpc('get_category_mix') : Promise.resolve({ data: [] as CategoryMixRow[], error: null }),
-          showAnalytics ? supabase.rpc('get_monthly_revenue_profit') : Promise.resolve({ data: [] as MonthlyRevenueProfitRow[], error: null }),
-          showAnalytics ? supabase.rpc('get_monthly_sales_volume') : Promise.resolve({ data: [] as MonthlySalesVolumeRow[], error: null }),
-          showAnalytics ? supabase.rpc('get_daily_product_profit') : Promise.resolve({ data: [] as DailyProductProfitRow[], error: null }),
-          showAnalytics
-            ? supabase
-                .from('expenses')
-                .select('category, amount')
-                .gte('incurred_at', dateKeyInTz(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), org.timezone))
-            : Promise.resolve({ data: [] as { category: ExpenseCategory; amount: number }[], error: null }),
-        ]);
+      const [kpisRes, topSellersRes, stockHealthRes, activityRes] = await Promise.all([
+        supabase.rpc('get_kpis'),
+        supabase.rpc('get_top_sellers', { p_limit: 5 }),
+        supabase.rpc('get_stock_health'),
+        supabase
+          .from('stock_movements')
+          .select('id, type, qty_delta, reason, created_at, products(name), profiles(first_name, last_name)')
+          .order('created_at', { ascending: false })
+          .limit(5),
+      ]);
       if (kpisRes.error) throw kpisRes.error;
       if (topSellersRes.error) throw topSellersRes.error;
       if (stockHealthRes.error) throw stockHealthRes.error;
       if (activityRes.error) throw activityRes.error;
+
+      return {
+        profile,
+        org,
+        isManagerTier,
+        kpis: kpisRes.data,
+        topSellers: topSellersRes.data ?? [],
+        stockHealth: (stockHealthRes.data ?? []) as StockHealthRow[],
+        activity: (activityRes.data ?? []) as unknown as ActivityRow[],
+      };
+    },
+    enabled: !!session,
+  });
+
+  // Free plan keeps the basic KPI cards (Today's Revenue etc. — role-gated
+  // only via isManagerTier) but loses the actual charts/trends/breakdowns,
+  // same split as Inventra/app/(app)/dashboard/page.tsx.
+  const showAnalytics = !!coreQuery.data?.isManagerTier && isPremium;
+
+  const analyticsQuery = useQuery({
+    queryKey: ['dashboard-analytics', session?.user.id, coreQuery.data?.org.timezone],
+    queryFn: async () => {
+      const org = coreQuery.data!.org;
+      const [categoryMixRes, revenueProfitRes, salesVolumeRes, dailyProfitRes, expensesRes] = await Promise.all([
+        supabase.rpc('get_category_mix'),
+        supabase.rpc('get_monthly_revenue_profit'),
+        supabase.rpc('get_monthly_sales_volume'),
+        supabase.rpc('get_daily_product_profit'),
+        supabase
+          .from('expenses')
+          .select('category, amount')
+          .gte('incurred_at', dateKeyInTz(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), org.timezone)),
+      ]);
       if (categoryMixRes.error) throw categoryMixRes.error;
       if (revenueProfitRes.error) throw revenueProfitRes.error;
       if (salesVolumeRes.error) throw salesVolumeRes.error;
@@ -150,7 +175,7 @@ export default function DashboardScreen() {
       // Inventra/lib/queries/expenses.ts's getExpenseCategoryBreakdown.
       const expenseTotals = new Map<ExpenseCategory, number>();
       let expenseGrandTotal = 0;
-      for (const row of expensesRes.data ?? []) {
+      for (const row of (expensesRes.data ?? []) as { category: ExpenseCategory; amount: number }[]) {
         const amount = Number(row.amount);
         expenseTotals.set(row.category, (expenseTotals.get(row.category) ?? 0) + amount);
         expenseGrandTotal += amount;
@@ -177,31 +202,23 @@ export default function DashboardScreen() {
         });
         monthCursor.setUTCMonth(monthCursor.getUTCMonth() + 1);
       }
-      const revenueByMonth = new Map((revenueProfitRes.data ?? []).map((m) => [m.month.slice(0, 7), Number(m.revenue)]));
-      const profitByMonth = new Map((revenueProfitRes.data ?? []).map((m) => [m.month.slice(0, 7), Number(m.profit)]));
-      const salesByMonth = new Map((salesVolumeRes.data ?? []).map((m) => [m.month.slice(0, 7), Number(m.count)]));
+      const revenueByMonth = new Map(((revenueProfitRes.data ?? []) as MonthlyRevenueProfitRow[]).map((m) => [m.month.slice(0, 7), Number(m.revenue)]));
+      const profitByMonth = new Map(((revenueProfitRes.data ?? []) as MonthlyRevenueProfitRow[]).map((m) => [m.month.slice(0, 7), Number(m.profit)]));
+      const salesByMonth = new Map(((salesVolumeRes.data ?? []) as MonthlySalesVolumeRow[]).map((m) => [m.month.slice(0, 7), Number(m.count)]));
 
       const chartMonths = canonicalMonths.map((m) => m.label);
       const revenueValues = canonicalMonths.map((m) => revenueByMonth.get(m.key) ?? 0);
       const profitValues = canonicalMonths.map((m) => profitByMonth.get(m.key) ?? 0);
       const salesVolumeValues = canonicalMonths.map((m) => salesByMonth.get(m.key) ?? 0);
 
-      const dailyProfit = dailyProfitRes.data ?? [];
+      const dailyProfit = (dailyProfitRes.data ?? []) as DailyProductProfitRow[];
       const todaysProfit = dailyProfit.reduce((sum, p) => sum + (Number(p.profit) || 0), 0);
 
-      const categoryMix = categoryMixRes.data ?? [];
+      const categoryMix = (categoryMixRes.data ?? []) as CategoryMixRow[];
       const totalCategoryValue = categoryMix.reduce((sum, c) => sum + Number(c.value), 0);
       const totalExpenseValue = expenseBreakdown.reduce((sum, e) => sum + e.amount, 0);
 
       return {
-        profile,
-        org,
-        isManagerTier,
-        showAnalytics,
-        kpis: kpisRes.data,
-        topSellers: topSellersRes.data ?? [],
-        stockHealth: (stockHealthRes.data ?? []) as StockHealthRow[],
-        activity: (activityRes.data ?? []) as unknown as ActivityRow[],
         categoryMix,
         totalCategoryValue,
         expenseBreakdown,
@@ -214,13 +231,13 @@ export default function DashboardScreen() {
         todaysProfit,
       };
     },
-    enabled: !!session && !entitlementsQuery.isLoading,
+    enabled: !!coreQuery.data && showAnalytics,
   });
   const reportsPermissionQuery = useHasPermission('reports', 'view');
   const teamMembersQuery = useTeamMembers();
   // Falls back to the device's own timezone before the org loads — only
-  // ever rendered once dashboardQuery.data is available anyway.
-  const liveTime = useLiveClock(dashboardQuery.data?.org.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
+  // ever rendered once coreQuery.data is available anyway.
+  const liveTime = useLiveClock(coreQuery.data?.org.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
   // Proactive alerts — same computation Ask AI uses, surfaced here so the
   // most urgent 1-2 signals don't require navigating away to see. Shares
   // the React Query cache key with Ask AI, so this is a no-op refetch if
@@ -229,10 +246,11 @@ export default function DashboardScreen() {
   const topAlerts = insightsQuery.data?.alerts.slice(0, 2) ?? [];
 
   function handleRefresh() {
-    void dashboardQuery.refetch();
+    void coreQuery.refetch();
+    if (showAnalytics) void analyticsQuery.refetch();
   }
 
-  if (dashboardQuery.isLoading) {
+  if (coreQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
         <View className="gap-3 px-5 pt-4">
@@ -250,7 +268,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  if (coreQuery.isError || !coreQuery.data) {
     return (
       <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
         <ErrorState onRetry={handleRefresh} />
@@ -258,26 +276,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const {
-    profile,
-    org,
-    isManagerTier,
-    showAnalytics,
-    kpis,
-    topSellers,
-    stockHealth,
-    activity,
-    categoryMix,
-    totalCategoryValue,
-    expenseBreakdown,
-    totalExpenseValue,
-    chartMonths,
-    revenueValues,
-    profitValues,
-    salesVolumeValues,
-    dailyProfit,
-    todaysProfit,
-  } = dashboardQuery.data;
+  const { profile, org, isManagerTier, kpis, topSellers, stockHealth, activity } = coreQuery.data;
   const greeting = greetingFor(org.timezone);
   const today = formatTodayHeader(org.timezone);
   const totalStock = stockHealth.reduce((sum, s) => (s.label === 'expiring' ? sum : sum + Number(s.count)), 0);
@@ -345,7 +344,7 @@ export default function DashboardScreen() {
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
       <ScrollView
         contentContainerClassName="px-5 pb-10 pt-2"
-        refreshControl={<RefreshControl refreshing={dashboardQuery.isRefetching} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={coreQuery.isRefetching || analyticsQuery.isRefetching} onRefresh={handleRefresh} />}
       >
         {!isPremium && <FreePlanBanner />}
         <View className="flex-row items-start justify-between">
@@ -547,36 +546,55 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {showAnalytics && (
+        {showAnalytics && !analyticsQuery.data && (
+          <View className="gap-3">
+            <Skeleton className="mt-5 h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+          </View>
+        )}
+
+        {showAnalytics && analyticsQuery.data && (
           <>
             <View className="mt-5 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[15px] font-bold text-text dark:text-text-dark">Sales trend</Text>
               <Text className="mb-1.5 text-[12px] text-muted dark:text-muted-dark">Transactions · last 12 months</Text>
-              <AreaChart months={chartMonths} series={[{ key: 'sales', color: '#0891b2', values: salesVolumeValues }]} idPrefix="sales" />
+              <AreaChart
+                months={analyticsQuery.data.chartMonths}
+                series={[{ key: 'sales', color: '#0891b2', values: analyticsQuery.data.salesVolumeValues }]}
+                idPrefix="sales"
+              />
             </View>
 
             <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[15px] font-bold text-text dark:text-text-dark">Revenue trend</Text>
               <Text className="mb-1.5 text-[12px] text-muted dark:text-muted-dark">Last 12 months</Text>
-              <AreaChart months={chartMonths} series={[{ key: 'revenue', color: '#2563eb', values: revenueValues }]} idPrefix="revenue" />
+              <AreaChart
+                months={analyticsQuery.data.chartMonths}
+                series={[{ key: 'revenue', color: '#2563eb', values: analyticsQuery.data.revenueValues }]}
+                idPrefix="revenue"
+              />
             </View>
 
             <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[15px] font-bold text-text dark:text-text-dark">Monthly profit</Text>
               <Text className="mb-1.5 text-[12px] text-muted dark:text-muted-dark">Last 12 months</Text>
-              <AreaChart months={chartMonths} series={[{ key: 'profit', color: '#10b981', values: profitValues }]} idPrefix="profit" />
+              <AreaChart
+                months={analyticsQuery.data.chartMonths}
+                series={[{ key: 'profit', color: '#10b981', values: analyticsQuery.data.profitValues }]}
+                idPrefix="profit"
+              />
             </View>
 
             <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[15px] font-bold text-text dark:text-text-dark">Category mix</Text>
               <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">Share of inventory value</Text>
               <View className="flex-row items-center gap-3.5">
-                <DonutChart data={categoryMix} totalLabel={formatMoney(totalCategoryValue, org.currency)} />
+                <DonutChart data={analyticsQuery.data.categoryMix} totalLabel={formatMoney(analyticsQuery.data.totalCategoryValue, org.currency)} />
                 <View className="flex-1 gap-2.5">
-                  {categoryMix.length === 0 && (
+                  {analyticsQuery.data.categoryMix.length === 0 && (
                     <EmptyState compact icon="🗂️" title="No inventory value yet" description="Add products to see category share." />
                   )}
-                  {categoryMix.slice(0, 5).map((c, i) => (
+                  {analyticsQuery.data.categoryMix.slice(0, 5).map((c, i) => (
                     <View key={c.name} className="flex-row items-center gap-2">
                       <View className="h-[9px] w-[9px] rounded-[3px]" style={{ backgroundColor: DONUT_PALETTE[i % DONUT_PALETTE.length] }} />
                       <Text className="flex-1 text-[12.5px] text-text-2 dark:text-text-2-dark" numberOfLines={1}>
@@ -593,12 +611,15 @@ export default function DashboardScreen() {
               <Text className="text-[15px] font-bold text-text dark:text-text-dark">Expense breakdown</Text>
               <Text className="mb-3.5 text-[12px] text-muted dark:text-muted-dark">Last 30 days by category</Text>
               <View className="flex-row items-center gap-3.5">
-                <DonutChart data={expenseBreakdown.map((e) => ({ name: e.label, pct: e.pct }))} totalLabel={formatMoney(totalExpenseValue, org.currency)} />
+                <DonutChart
+                  data={analyticsQuery.data.expenseBreakdown.map((e) => ({ name: e.label, pct: e.pct }))}
+                  totalLabel={formatMoney(analyticsQuery.data.totalExpenseValue, org.currency)}
+                />
                 <View className="flex-1 gap-2.5">
-                  {expenseBreakdown.length === 0 && (
+                  {analyticsQuery.data.expenseBreakdown.length === 0 && (
                     <EmptyState compact icon="💸" title="No expenses recorded" description="Log an expense to see the breakdown." />
                   )}
-                  {expenseBreakdown.slice(0, 5).map((e, i) => (
+                  {analyticsQuery.data.expenseBreakdown.slice(0, 5).map((e, i) => (
                     <View key={e.category} className="flex-row items-center gap-2">
                       <View className="h-[9px] w-[9px] rounded-[3px]" style={{ backgroundColor: DONUT_PALETTE[i % DONUT_PALETTE.length] }} />
                       <Text className="flex-1 text-[12.5px] text-text-2 dark:text-text-2-dark" numberOfLines={1}>
@@ -724,7 +745,7 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {showAnalytics && (
+        {showAnalytics && analyticsQuery.data && (
           <View className="mt-4 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
             <View className="mb-3.5 flex-row items-start justify-between">
               <View className="flex-1">
@@ -733,12 +754,14 @@ export default function DashboardScreen() {
               </View>
               <View className="items-end">
                 <Text className="text-[10.5px] font-semibold uppercase tracking-[0.04em] text-muted dark:text-muted-dark">Today&apos;s profit</Text>
-                <Text className={`font-mono text-[17px] font-bold ${todaysProfit >= 0 ? 'text-green dark:text-green-dark' : 'text-red dark:text-red-dark'}`}>
-                  {formatMoney(todaysProfit, org.currency)}
+                <Text
+                  className={`font-mono text-[17px] font-bold ${analyticsQuery.data.todaysProfit >= 0 ? 'text-green dark:text-green-dark' : 'text-red dark:text-red-dark'}`}
+                >
+                  {formatMoney(analyticsQuery.data.todaysProfit, org.currency)}
                 </Text>
               </View>
             </View>
-            <DailyProfitList rows={dailyProfit} currency={org.currency} />
+            <DailyProfitList rows={analyticsQuery.data.dailyProfit} currency={org.currency} />
           </View>
         )}
 
