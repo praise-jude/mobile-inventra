@@ -18,7 +18,7 @@ import {
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useTeamMembers } from '@/lib/hooks/use-team';
+import { useActiveTeamMembers } from '@/lib/hooks/use-team';
 import { useProductsInWarehouse, useWarehousesOverview } from '@/lib/hooks/use-warehouses';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 
@@ -55,7 +55,7 @@ function WarehouseEditForm({
   const queryClient = useQueryClient();
   const profileQuery = useMyProfile();
   const overviewQuery = useWarehousesOverview();
-  const teamQuery = useTeamMembers();
+  const teamQuery = useActiveTeamMembers();
   const productsQuery = useProductsInWarehouse(id);
 
   const canManage = isAdminRole(profileQuery.data?.role ?? '');
@@ -77,7 +77,7 @@ function WarehouseEditForm({
   const [transferring, setTransferring] = useState(false);
 
   const managerOptions = useMemo(
-    () => (teamQuery.data ?? []).filter((m) => m.status === 'active').map((m) => ({ label: `${m.name} (${m.role})`, value: m.id })),
+    () => (teamQuery.data ?? []).map((m) => ({ label: `${m.name} (${m.role})`, value: m.id })),
     [teamQuery.data],
   );
   const otherWarehouseOptions = useMemo(

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -8,7 +9,7 @@ import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { inviteMember } from '@/lib/actions/team';
 import { haptics } from '@/lib/haptics';
-import { useTeamMembers, useBranches } from '@/lib/hooks/use-team';
+import { useBranches } from '@/lib/hooks/use-team';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { isAdminRole } from '@/lib/roles';
 
@@ -29,7 +30,7 @@ const MANAGER_ROLE_OPTIONS = [
 // Mirrors Inventra/components/team/InviteMemberModal.tsx as a full screen
 // instead of a dialog — same fields, same admin-API-backed submit path.
 export default function InviteMemberScreen() {
-  const teamQuery = useTeamMembers();
+  const queryClient = useQueryClient();
   const branchesQuery = useBranches();
   const profileQuery = useMyProfile();
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
@@ -60,7 +61,10 @@ export default function InviteMemberScreen() {
         branchId: form.branchId,
       });
       haptics.success();
-      await teamQuery.invalidate();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['team-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['team-members-page'] }),
+      ]);
       router.back();
     } catch (err) {
       haptics.warning();

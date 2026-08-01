@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
@@ -13,9 +14,10 @@ import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { haptics } from '@/lib/haptics';
 import { timeAgo } from '@/lib/format';
+import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useTeamMembers, type TeamMemberRow } from '@/lib/hooks/use-team';
+import { useTeamMembersList, useTeamSummary, type TeamMemberRow, type TeamStatusFilter } from '@/lib/hooks/use-team';
 import { isAdminRole } from '@/lib/roles';
 import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 
@@ -52,6 +54,24 @@ const FILTERS = [
 
 type StatusFilter = (typeof FILTERS)[number][0];
 
+function summaryCountFor(summary: { total: number; invited: number; awaitingApproval: number; active: number; suspended: number; rejected: number } | undefined, key: StatusFilter): number {
+  if (!summary) return 0;
+  switch (key) {
+    case 'all':
+      return summary.total;
+    case 'invited':
+      return summary.invited;
+    case 'awaiting_approval':
+      return summary.awaitingApproval;
+    case 'active':
+      return summary.active;
+    case 'suspended':
+      return summary.suspended;
+    case 'rejected':
+      return summary.rejected;
+  }
+}
+
 function displayStatus(m: TeamMemberRow): 'invited' | 'awaiting_approval' | 'active' | 'suspended' | 'rejected' {
   if (m.rejectedAt) return 'rejected';
   if (m.suspendedAt) return 'suspended';
@@ -66,32 +86,36 @@ export default function TeamScreen() {
   const entitlementsQuery = useEntitlements();
   const isPremium = entitlementsQuery.data?.tier === 'premium';
   const { openUpgradeModal } = useUpgradeModal();
-  const query = useTeamMembers();
+  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [target, setTarget] = useState<TeamMemberRow | null>(null);
   const [rejecting, setRejecting] = useState(false);
 
-  const members = query.data ?? [];
-  const filtered = useMemo(() => {
-    const rows = query.data ?? [];
-    let result = statusFilter === 'all' ? rows : rows.filter((m) => displayStatus(m) === statusFilter);
-    const q = search.trim().toLowerCase();
-    if (q) {
-      result = result.filter(
-        (m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.role.toLowerCase().includes(q) || (m.branchName ?? '').toLowerCase().includes(q),
-      );
-    }
-    return result;
-  }, [query.data, statusFilter, search]);
+  const summaryQuery = useTeamSummary();
+  const listQuery = useTeamMembersList({
+    search: debouncedSearch,
+    status: statusFilter === 'all' ? undefined : (statusFilter as TeamStatusFilter),
+  });
+  const query = { isLoading: summaryQuery.isLoading || listQuery.isLoading, isError: summaryQuery.isError || listQuery.isError };
+  const filtered = useMemo(() => listQuery.data?.pages.flatMap((p) => p.rows) ?? [], [listQuery.data]);
+
+  const refetchAll = () => {
+    void summaryQuery.refetch();
+    void listQuery.refetch();
+  };
 
   const run = async (id: string, action: () => Promise<void>) => {
     setBusyId(id);
     try {
       await action();
       haptics.success();
-      await query.invalidate();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['team-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['team-members-page'] }),
+      ]);
       setTarget(null);
       setRejecting(false);
     } catch (err) {
@@ -138,14 +162,14 @@ export default function TeamScreen() {
           <ActivityIndicator />
         </View>
       ) : query.isError ? (
-        <ErrorState onRetry={() => query.refetch()} />
+        <ErrorState onRetry={refetchAll} />
       ) : (
         <>
           <View className="gap-3 px-4 pt-3">
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search by name, email, role…"
+              placeholder="Search by name or email…"
               placeholderTextColor="#aab2c4"
               className="h-[42px] w-full rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
             />
@@ -156,7 +180,7 @@ export default function TeamScreen() {
               keyExtractor={([key]) => key}
               contentContainerClassName="gap-2"
               renderItem={({ item: [key, label] }) => {
-                const count = key === 'all' ? members.length : members.filter((m) => displayStatus(m) === key).length;
+                const count = summaryCountFor(summaryQuery.data, key);
                 const active = statusFilter === key;
                 return (
                   <Pressable
@@ -180,7 +204,11 @@ export default function TeamScreen() {
             keyExtractor={(m) => m.id}
             {...FLATLIST_PERF_PROPS}
             contentContainerClassName="gap-2.5 p-4 pb-10"
-            refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
+            refreshControl={<RefreshControl refreshing={listQuery.isRefetching} onRefresh={refetchAll} />}
+            onEndReached={() => {
+              if (listQuery.hasNextPage) void listQuery.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.4}
             ListEmptyComponent={<EmptyState icon="👥" title="No members found" description="Try a different search or filter." />}
             renderItem={({ item: m }) => {
               const status = displayStatus(m);

@@ -7,7 +7,7 @@ import { signOut } from '@/lib/actions/auth';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useTeamMembers } from '@/lib/hooks/use-team';
+import { usePendingApprovalsCount } from '@/lib/hooks/use-team';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 
 // Security (MFA) is every role's own account setting, unconditional —
@@ -60,16 +60,9 @@ export default function SettingsScreen() {
   // Only fetched for the Team row's pending-approvals pill — mirrors
   // (tabs)/index.tsx's Dashboard card scoping exactly (Owner/Admin see the
   // whole org's queue, a Manager only their own branch's).
-  const teamMembersQuery = useTeamMembers();
   const profile = profileQuery.data;
-  const pendingApprovalsCount =
-    isManagerUp && profile
-      ? (teamMembersQuery.data ?? []).filter(
-          (m) =>
-            m.status === 'awaiting_approval' &&
-            (isAdmin || (profile.role === 'manager' && !!profile.branch_id && m.branchId === profile.branch_id)),
-        ).length
-      : 0;
+  const pendingApprovalsCountQuery = usePendingApprovalsCount(profile?.role, profile?.branch_id);
+  const pendingApprovalsCount = isManagerUp ? pendingApprovalsCountQuery.data ?? 0 : 0;
 
   function Row(row: {
     href:

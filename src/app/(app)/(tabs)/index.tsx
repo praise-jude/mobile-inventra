@@ -22,9 +22,9 @@ import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
-import { useTeamMembers } from '@/lib/hooks/use-team';
+import { useActiveTeamMembers, usePendingApprovalsCount } from '@/lib/hooks/use-team';
 import { MOVEMENT_META } from '@/lib/movement-meta';
-import { isAdminRole, isManagerRole } from '@/lib/roles';
+import { isManagerRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
 import type { CategoryMixRow, DailyProductProfitRow, ExpenseCategory, MonthlyRevenueProfitRow, MonthlySalesVolumeRow, StockHealthRow } from '@/types/database';
 
@@ -234,7 +234,8 @@ export default function DashboardScreen() {
     enabled: !!coreQuery.data && showAnalytics,
   });
   const reportsPermissionQuery = useHasPermission('reports', 'view');
-  const teamMembersQuery = useTeamMembers();
+  const activeTeamMembersQuery = useActiveTeamMembers();
+  const pendingApprovalsCountQuery = usePendingApprovalsCount(coreQuery.data?.profile.role, coreQuery.data?.profile.branch_id);
   // Falls back to the device's own timezone before the org loads — only
   // ever rendered once coreQuery.data is available anyway.
   const liveTime = useLiveClock(coreQuery.data?.org.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -285,11 +286,7 @@ export default function DashboardScreen() {
   // branch-scoped RLS/trigger it's built against: Owner/Admin see the
   // whole org's queue, a Manager only their own branch's, Cashier/
   // Warehouse always 0.
-  const pendingApprovalsCount = (teamMembersQuery.data ?? []).filter(
-    (m) =>
-      m.status === 'awaiting_approval' &&
-      (isAdminRole(profile.role) || (profile.role === 'manager' && !!profile.branch_id && m.branchId === profile.branch_id)),
-  ).length;
+  const pendingApprovalsCount = pendingApprovalsCountQuery.data ?? 0;
 
   const kpiCards = [
     {
@@ -739,9 +736,9 @@ export default function DashboardScreen() {
           )}
         </View>
 
-        {showAnalytics && teamMembersQuery.data && (
+        {showAnalytics && activeTeamMembersQuery.data && (
           <View className="mt-4">
-            <TeamPresenceCard members={teamMembersQuery.data} />
+            <TeamPresenceCard members={activeTeamMembersQuery.data} />
           </View>
         )}
 

@@ -9,18 +9,18 @@ import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
 import { createWarehouse, type WarehouseInput } from '@/lib/actions/warehouses';
 import { haptics } from '@/lib/haptics';
-import { useTeamMembers } from '@/lib/hooks/use-team';
+import { useActiveTeamMembers } from '@/lib/hooks/use-team';
 
 export default function NewWarehouseScreen() {
   const queryClient = useQueryClient();
-  const teamQuery = useTeamMembers();
+  const teamQuery = useActiveTeamMembers();
   const [form, setForm] = useState<WarehouseInput>({ name: '', address: '', country: '', state: '', phone: '', managerProfileId: undefined, capacity: undefined });
   const [capacityText, setCapacityText] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const managerOptions = useMemo(
-    () => (teamQuery.data ?? []).filter((m) => m.status === 'active').map((m) => ({ label: `${m.name} (${m.role})`, value: m.id })),
+    () => (teamQuery.data ?? []).map((m) => ({ label: `${m.name} (${m.role})`, value: m.id })),
     [teamQuery.data],
   );
 
