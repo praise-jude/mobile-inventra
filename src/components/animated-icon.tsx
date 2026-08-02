@@ -7,6 +7,8 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAuth } from '@/lib/auth-context';
+import { useIntroSeen } from '@/lib/first-launch';
 
 const DURATION = 600;
 
@@ -16,10 +18,27 @@ const DURATION = 600;
 const LOGO = require('@/assets/images/brand-logo.png');
 
 export function AnimatedSplashOverlay() {
-  const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [laidOut, setLaidOut] = useState(false);
   const scheme = useColorScheme();
   const bg = Colors[scheme === 'dark' ? 'dark' : 'light'].background;
+
+  // Was a fixed timer (started fading out on this view's own onLayout,
+  // regardless of whether the app actually had anything ready to show
+  // underneath) — on a slow connection this meant the splash faded out to
+  // reveal a blank frame while RootNavigator (_layout.tsx) was still
+  // returning null waiting on the same session/gate/AAL queries. Mirrors
+  // RootNavigator's own blocking condition exactly, so the splash only
+  // starts its exit animation once there's real content to reveal.
+  // Both `laidOut` and `ready` are monotonic (false -> true, never back),
+  // so deriving `animate` directly rather than mirroring it into its own
+  // state avoids an extra render + effect for what's really just a
+  // computed value.
+  const { initializing, gateLoading, aalLoading, session } = useAuth();
+  const { seen: introSeen } = useIntroSeen();
+  const authed = !!session;
+  const ready = introSeen !== null && !initializing && !(authed && (gateLoading || aalLoading));
+  const animate = laidOut && ready;
 
   if (!visible) return null;
 
@@ -58,9 +77,12 @@ export function AnimatedSplashOverlay() {
   ) : (
     <View
       onLayout={() => {
-        SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
-        });
+        // Safe to hide the native splash as soon as this JS view has laid
+        // out — it's pixel-identical to the native one, so the handoff is
+        // invisible. The exit animation (which reveals real app content)
+        // is gated separately on `ready` via the effect above.
+        void SplashScreen.hideAsync();
+        setLaidOut(true);
       }}
       style={[styles.splashOverlay, { backgroundColor: bg }]}>
       {image}

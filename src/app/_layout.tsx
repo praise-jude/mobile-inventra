@@ -20,7 +20,21 @@ import { UpgradeModalProvider } from '@/lib/upgrade-modal-context';
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+// Default staleTime was 0 (React Query's own default) — every query
+// re-fetched on every screen mount, even ones just visited seconds ago,
+// showing a skeleton flash on every tab switch/back-navigation even
+// though the data almost certainly hadn't changed. Every mutation in
+// this app already explicitly invalidates the relevant query keys right
+// after a successful write (the established pattern throughout), so a
+// 30s window doesn't risk staleness — it just stops re-fetching data
+// nothing has touched.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+    },
+  },
+});
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
