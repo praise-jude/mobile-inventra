@@ -1,7 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import Papa from 'papaparse';
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,7 +17,7 @@ import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
-import { useCategories, useProducts, useSuppliers, useWarehouses } from '@/lib/hooks/use-products';
+import { useCategories, useProducts, useSuppliers, useWarehouses, type ProductSearchRow } from '@/lib/hooks/use-products';
 import { parseSmartQuery } from '@/lib/smart-query';
 import type { ProductStatus } from '@/types/database';
 
@@ -46,6 +46,47 @@ const STATUS_FILTERS: { key: ProductStatus | 'all'; label: string }[] = [
   { key: 'out_of_stock', label: 'Out of stock' },
 ];
 
+// Extracted + memoized so FlatList doesn't recreate every row's render
+// function (and diff every row's JSX) on each re-render of the screen —
+// was previously an inline renderItem closure.
+const ProductRow = memo(function ProductRow({
+  item,
+  currency,
+  onPress,
+}: {
+  item: ProductSearchRow;
+  currency: string;
+  onPress: (id: string) => void;
+}) {
+  const meta = STATUS_META[item.status];
+  return (
+    <Pressable
+      onPress={() => {
+        haptics.tap();
+        onPress(item.id);
+      }}
+      className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
+    >
+      <View className="h-11 w-11 items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
+        <Text className="text-[20px]">{item.emoji || '📦'}</Text>
+      </View>
+      <View className="flex-1">
+        <Text className="text-[14px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text className="text-[11.5px] text-muted dark:text-muted-dark">
+          {item.sku} · {formatMoney(item.sell_price, currency)}
+        </Text>
+      </View>
+      <View className={`rounded-full px-2 py-0.5 ${meta.badgeClass}`}>
+        <Text className={`text-[11px] font-bold ${meta.textClass}`}>
+          {item.qty_on_hand} {meta.label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+});
+
 // Mirrors Inventra/components/products/ProductsClient.tsx, trimmed to
 // mobile's single-column list — search + status filter + infinite scroll,
 // with Adjustments/Movements as quick links rather than separate tabs
@@ -71,6 +112,7 @@ export default function InventoryScreen() {
   const [maxMargin, setMaxMargin] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const currency = useOrgCurrency();
+  const handleOpenProduct = useCallback((id: string) => router.push(`/inventory/${id}`), []);
 
   const categoriesQuery = useCategories();
   const warehousesQuery = useWarehouses();
@@ -371,35 +413,7 @@ export default function InventoryScreen() {
             <EmptyState icon="📦" title="No products yet" description="Add your first product to start tracking inventory." />
           }
           ItemSeparatorComponent={() => <View className="h-2.5" />}
-          renderItem={({ item }) => {
-            const meta = STATUS_META[item.status];
-            return (
-              <Pressable
-                onPress={() => {
-                  haptics.tap();
-                  router.push(`/inventory/${item.id}`);
-                }}
-                className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
-              >
-                <View className="h-11 w-11 items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
-                  <Text className="text-[20px]">{item.emoji || '📦'}</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-[14px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text className="text-[11.5px] text-muted dark:text-muted-dark">
-                    {item.sku} · {formatMoney(item.sell_price, currency)}
-                  </Text>
-                </View>
-                <View className={`rounded-full px-2 py-0.5 ${meta.badgeClass}`}>
-                  <Text className={`text-[11px] font-bold ${meta.textClass}`}>
-                    {item.qty_on_hand} {meta.label}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          }}
+          renderItem={({ item }) => <ProductRow item={item} currency={currency} onPress={handleOpenProduct} />}
         />
       )}
     </SafeAreaView>

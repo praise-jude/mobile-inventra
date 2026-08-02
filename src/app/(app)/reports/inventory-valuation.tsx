@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -52,6 +52,7 @@ export default function InventoryValuationScreen() {
           keyExtractor={(item) => item.productId}
           {...FLATLIST_PERF_PROPS}
           contentContainerClassName="p-5"
+          refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           ListHeaderComponent={
             (query.data?.length ?? 0) > 0 ? (
               <View className="mb-4 flex-row gap-3">

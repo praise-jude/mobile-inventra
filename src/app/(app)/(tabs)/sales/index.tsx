@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,7 +12,7 @@ import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
-import { useSales } from '@/lib/hooks/use-sales';
+import { useSales, type SaleListRow } from '@/lib/hooks/use-sales';
 import type { PaymentMethod } from '@/types/database';
 
 const PAYMENT_FILTERS: { key: PaymentMethod | 'all'; label: string }[] = [
@@ -22,6 +22,35 @@ const PAYMENT_FILTERS: { key: PaymentMethod | 'all'; label: string }[] = [
   { key: 'bank_transfer', label: 'Bank Transfer' },
   { key: 'mobile_money', label: 'Mobile Money' },
 ];
+
+// Extracted + memoized so FlatList doesn't recreate every row's render
+// function on each re-render of the screen — was previously an inline
+// renderItem closure.
+const SaleRow = memo(function SaleRow({ item, currency, onPress }: { item: SaleListRow; currency: string; onPress: (id: string) => void }) {
+  return (
+    <Pressable
+      onPress={() => {
+        haptics.tap();
+        onPress(item.id);
+      }}
+      className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
+    >
+      <View className="h-10 w-10 items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
+        <Text className="text-[16px]">🧾</Text>
+      </View>
+      <View className="flex-1">
+        <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
+          {item.customerName}
+        </Text>
+        <Text className="text-[11.5px] text-muted dark:text-muted-dark">
+          {item.warehouseName ? `${item.warehouseName} · ` : ''}
+          {timeAgo(item.createdAt)}
+        </Text>
+      </View>
+      <Text className="font-mono text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.total, currency)}</Text>
+    </Pressable>
+  );
+});
 
 // Mirrors Inventra/components/sales/SalesClient.tsx — search + infinite
 // scroll list, tap a row for the receipt/detail screen. "New Sale" is
@@ -37,6 +66,7 @@ export default function SalesScreen() {
 
   const query = useSales({ search: debouncedSearch, paymentMethod: paymentFilter === 'all' ? undefined : paymentFilter });
   const sales = useMemo(() => query.data?.pages.flatMap((p) => p.rows) ?? [], [query.data]);
+  const handleOpenSale = useCallback((id: string) => router.push(`/sales/${id}`), []);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -120,29 +150,7 @@ export default function SalesScreen() {
             />
           }
           ItemSeparatorComponent={() => <View className="h-2.5" />}
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => {
-                haptics.tap();
-                router.push(`/sales/${item.id}`);
-              }}
-              className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
-            >
-              <View className="h-10 w-10 items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
-                <Text className="text-[16px]">🧾</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
-                  {item.customerName}
-                </Text>
-                <Text className="text-[11.5px] text-muted dark:text-muted-dark">
-                  {item.warehouseName ? `${item.warehouseName} · ` : ''}
-                  {timeAgo(item.createdAt)}
-                </Text>
-              </View>
-              <Text className="font-mono text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.total, currency)}</Text>
-            </Pressable>
-          )}
+          renderItem={({ item }) => <SaleRow item={item} currency={currency} onPress={handleOpenSale} />}
         />
       )}
     </SafeAreaView>

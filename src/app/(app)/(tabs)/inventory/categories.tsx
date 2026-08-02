@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -105,6 +105,7 @@ export default function CategoriesScreen() {
           keyExtractor={(c) => c.id}
           {...FLATLIST_PERF_PROPS}
           contentContainerClassName="gap-2 px-4 pb-6"
+          refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           renderItem={({ item }) => (
             <View className="flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
               <View className="h-9 w-9 items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">

@@ -11,6 +11,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { AppErrorBoundary } from '@/components/error-boundary';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { IntroSeenProvider, useIntroSeen } from '@/lib/first-launch';
@@ -24,20 +25,22 @@ const queryClient = new QueryClient();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
-    <ThemePreferenceProvider>
-      <QueryClientProvider client={queryClient}>
-        <IntroSeenProvider>
-          <AuthProvider>
-            <UpgradeModalProvider>
-              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                <AnimatedSplashOverlay />
-                <RootNavigator />
-              </ThemeProvider>
-            </UpgradeModalProvider>
-          </AuthProvider>
-        </IntroSeenProvider>
-      </QueryClientProvider>
-    </ThemePreferenceProvider>
+    <AppErrorBoundary>
+      <ThemePreferenceProvider>
+        <QueryClientProvider client={queryClient}>
+          <IntroSeenProvider>
+            <AuthProvider>
+              <UpgradeModalProvider>
+                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                  <AnimatedSplashOverlay />
+                  <RootNavigator />
+                </ThemeProvider>
+              </UpgradeModalProvider>
+            </AuthProvider>
+          </IntroSeenProvider>
+        </QueryClientProvider>
+      </ThemePreferenceProvider>
+    </AppErrorBoundary>
   );
 }
 

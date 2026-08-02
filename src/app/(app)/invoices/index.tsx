@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,6 +21,27 @@ const STATUS_STYLE: Record<InvoiceRow['status'], { label: string; className: str
   void: { label: 'Void', className: 'text-muted dark:text-muted-dark bg-border-2 dark:bg-border-2-dark' },
 };
 
+// Extracted + memoized so FlatList doesn't recreate every row's render
+// function on each re-render of the screen — was previously an inline
+// renderItem closure.
+const InvoiceRowItem = memo(function InvoiceRowItem({ item, currency, onPress }: { item: InvoiceRow; currency: string; onPress: (id: string) => void }) {
+  return (
+    <Pressable
+      onPress={() => onPress(item.id)}
+      className="flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
+    >
+      <View className="flex-1">
+        <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark">{item.customerName}</Text>
+        <Text className="text-[11px] text-muted dark:text-muted-dark">{item.invoiceNumber}</Text>
+        <View className={`mt-1.5 self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
+          <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
+        </View>
+      </View>
+      <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.total, currency)}</Text>
+    </Pressable>
+  );
+});
+
 // Mirrors Inventra/components/invoices/InvoicesClient.tsx. List is
 // server-paginated (useInvoicesList) same as Inventory/Customers, not a
 // client-side filter over one unbounded fetch anymore.
@@ -31,6 +52,7 @@ export default function InvoicesScreen() {
   const debouncedSearch = useDebouncedValue(search, 300);
   const listQuery = useInvoicesList({ search: debouncedSearch });
   const invoices = useMemo(() => listQuery.data?.pages.flatMap((p) => p.rows) ?? [], [listQuery.data]);
+  const handleOpenInvoice = useCallback((id: string) => router.push(`/invoices/${id}`), []);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -89,21 +111,7 @@ export default function InvoicesScreen() {
                 if (listQuery.hasNextPage) void listQuery.fetchNextPage();
               }}
               onEndReachedThreshold={0.4}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => router.push(`/invoices/${item.id}`)}
-                  className="flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
-                >
-                  <View className="flex-1">
-                    <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark">{item.customerName}</Text>
-                    <Text className="text-[11px] text-muted dark:text-muted-dark">{item.invoiceNumber}</Text>
-                    <View className={`mt-1.5 self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
-                      <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
-                    </View>
-                  </View>
-                  <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.total, currency)}</Text>
-                </Pressable>
-              )}
+              renderItem={({ item }) => <InvoiceRowItem item={item} currency={currency} onPress={handleOpenInvoice} />}
             />
           )}
         </>

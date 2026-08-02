@@ -12,7 +12,7 @@ import { deleteExpense, updateExpense } from '@/lib/actions/expenses';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
-import { CATEGORY_LABEL, useExpenseCategoryBreakdown, useExpensesOverview, type ExpenseRow } from '@/lib/hooks/use-expenses';
+import { CATEGORY_LABEL, useExpenseCategoryBreakdown, useExpensesTotals, useRecentExpenses, type ExpenseRow } from '@/lib/hooks/use-expenses';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
 import { useUpgradeModal } from '@/lib/upgrade-modal-context';
@@ -28,7 +28,8 @@ const CATEGORY_OPTIONS = (Object.keys(CATEGORY_LABEL) as ExpenseCategory[]).map(
 export default function ExpensesScreen() {
   const queryClient = useQueryClient();
   const currency = useOrgCurrency();
-  const overviewQuery = useExpensesOverview();
+  const totalsQuery = useExpensesTotals();
+  const recentQuery = useRecentExpenses();
   const breakdownQuery = useExpenseCategoryBreakdown();
   const entitlementsQuery = useEntitlements();
   const isPremium = entitlementsQuery.data?.tier === 'premium';
@@ -37,7 +38,8 @@ export default function ExpensesScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ['expenses-overview'] });
+    queryClient.invalidateQueries({ queryKey: ['expenses-totals'] });
+    queryClient.invalidateQueries({ queryKey: ['recent-expenses'] });
     queryClient.invalidateQueries({ queryKey: ['expense-category-breakdown'] });
   }
 
@@ -74,22 +76,23 @@ export default function ExpensesScreen() {
         <View className="w-12" />
       </View>
 
-      {overviewQuery.isLoading ? (
+      {totalsQuery.isLoading || recentQuery.isLoading ? (
         <View className="gap-2.5 p-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-[64px] w-full" />
           ))}
         </View>
-      ) : overviewQuery.isError ? (
-        <ErrorState onRetry={() => overviewQuery.refetch()} />
+      ) : totalsQuery.isError || recentQuery.isError ? (
+        <ErrorState onRetry={() => (totalsQuery.isError ? totalsQuery.refetch() : recentQuery.refetch())} />
       ) : (
         <ScrollView
           contentContainerClassName="gap-3.5 p-4"
           refreshControl={
             <RefreshControl
-              refreshing={overviewQuery.isRefetching || breakdownQuery.isRefetching}
+              refreshing={totalsQuery.isRefetching || recentQuery.isRefetching || breakdownQuery.isRefetching}
               onRefresh={() => {
-                void overviewQuery.refetch();
+                void totalsQuery.refetch();
+                void recentQuery.refetch();
                 void breakdownQuery.refetch();
               }}
             />
@@ -98,15 +101,15 @@ export default function ExpensesScreen() {
           <View className="flex-row gap-2.5">
             <View className="flex-1 rounded-2xl border border-border bg-surface p-3 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[10.5px] text-muted dark:text-muted-dark">Today</Text>
-              <Text className="text-[14px] font-bold text-text dark:text-text-dark">{formatMoney(overviewQuery.data!.dailyTotal, currency)}</Text>
+              <Text className="text-[14px] font-bold text-text dark:text-text-dark">{formatMoney(totalsQuery.data!.dailyTotal, currency)}</Text>
             </View>
             <View className="flex-1 rounded-2xl border border-border bg-surface p-3 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[10.5px] text-muted dark:text-muted-dark">This week</Text>
-              <Text className="text-[14px] font-bold text-text dark:text-text-dark">{formatMoney(overviewQuery.data!.weeklyTotal, currency)}</Text>
+              <Text className="text-[14px] font-bold text-text dark:text-text-dark">{formatMoney(totalsQuery.data!.weeklyTotal, currency)}</Text>
             </View>
             <View className="flex-1 rounded-2xl border border-border bg-surface p-3 dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[10.5px] text-muted dark:text-muted-dark">This month</Text>
-              <Text className="text-[14px] font-bold text-text dark:text-text-dark">{formatMoney(overviewQuery.data!.monthlyTotal, currency)}</Text>
+              <Text className="text-[14px] font-bold text-text dark:text-text-dark">{formatMoney(totalsQuery.data!.monthlyTotal, currency)}</Text>
             </View>
           </View>
 
@@ -143,10 +146,10 @@ export default function ExpensesScreen() {
           )}
 
           <Text className="text-[13px] font-bold text-text dark:text-text-dark">Recent expenses</Text>
-          {overviewQuery.data!.expenses.length === 0 ? (
+          {recentQuery.data!.length === 0 ? (
             <EmptyState icon="💸" title="No expenses yet" description="Log an expense to start tracking spend." />
           ) : (
-            overviewQuery.data!.expenses.map((e) => (
+            recentQuery.data!.map((e) => (
               <View key={e.id} className="rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
                 <View className="flex-row items-center justify-between">
                   <Text className="text-[13px] font-semibold text-text dark:text-text-dark">{CATEGORY_LABEL[e.category]}</Text>

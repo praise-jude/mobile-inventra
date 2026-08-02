@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { FlatList, Pressable, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -76,6 +76,7 @@ export default function NotificationsScreen() {
           keyExtractor={(n) => n.id}
           {...FLATLIST_PERF_PROPS}
           contentContainerClassName="p-4"
+          refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           ListEmptyComponent={
             <EmptyState icon="🔔" title="No notifications yet" description="Approvals, rejections, and team activity will show up here." />
           }
