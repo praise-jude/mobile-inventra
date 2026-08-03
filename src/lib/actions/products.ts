@@ -7,6 +7,7 @@
 import { logAudit } from '@/lib/actions/audit';
 import { createApprovalRequest, getApprovalSettings } from '@/lib/approval-service';
 import { canAddProduct, canBulkImportExport, canDeleteProduct, canEditProduct, UpgradeRequiredError } from '@/lib/entitlements';
+import { logError } from '@/lib/logger';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -66,6 +67,7 @@ export async function createProduct(input: CreateProductInput): Promise<string> 
     .single();
   if (error) {
     if (error.code === '23505') throw new Error('A product with this SKU or barcode already exists.');
+    logError({ feature: 'Products', action: 'createProduct', orgId: profile.org_id }, 'product insert failed', error);
     throw new Error('Could not create the product.');
   }
 
@@ -170,6 +172,7 @@ export async function performUpdateProduct(
     .maybeSingle();
   if (error) {
     if (error.code === '23505') throw new Error('A product with this SKU or barcode already exists.');
+    logError({ feature: 'Products', action: 'updateProduct', orgId }, 'product update failed', error);
     throw new Error('Could not update the product.');
   }
   // A Postgres UPDATE that matches zero rows (wrong id, or blocked by RLS)
@@ -315,7 +318,10 @@ export async function deleteProduct(id: string): Promise<void> {
     .eq('org_id', profile.org_id)
     .select('id')
     .maybeSingle();
-  if (error) throw new Error('Could not delete the product.');
+  if (error) {
+    logError({ feature: 'Products', action: 'deleteProduct', orgId: profile.org_id }, 'product delete failed', error);
+    throw new Error('Could not delete the product.');
+  }
   if (!deleted) throw new Error('Could not delete the product — it may have already been removed.');
 
   void logAudit({

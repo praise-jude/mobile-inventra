@@ -5,6 +5,7 @@
 import { logAudit } from '@/lib/actions/audit';
 import { createApprovalRequest, getApprovalSettings } from '@/lib/approval-service';
 import { canCreateSale, canEditSale, canVoidSale, UpgradeRequiredError } from '@/lib/entitlements';
+import { logError } from '@/lib/logger';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -115,7 +116,10 @@ export async function performRecordSale(
     })
     .select('id')
     .single();
-  if (saleError || !sale) throw new Error('Could not record the sale.');
+  if (saleError || !sale) {
+    logError({ feature: 'Sales', action: 'recordSale' }, 'sale insert failed', saleError);
+    throw new Error('Could not record the sale.');
+  }
 
   const { error: payError } = await supabase
     .from('sale_payments')

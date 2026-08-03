@@ -1,6 +1,7 @@
 // Direct-Supabase equivalent of Inventra/lib/actions/warehouses.ts.
 import { logAudit } from '@/lib/actions/audit';
 import { canManageBranches, canTransferProduct, UpgradeRequiredError } from '@/lib/entitlements';
+import { logError } from '@/lib/logger';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -141,7 +142,10 @@ export async function transferWarehouseStock(productId: string, toWarehouseId: s
   if (product.warehouse_id === toWarehouseId) throw new Error('Product is already in that branch.');
 
   const { error: updateError } = await supabase.from('products').update({ warehouse_id: toWarehouseId }).eq('id', productId).eq('org_id', profile.org_id);
-  if (updateError) throw new Error('Could not transfer the product.');
+  if (updateError) {
+    logError({ feature: 'Inventory', action: 'transferWarehouseStock', orgId: profile.org_id }, 'product warehouse update failed', updateError);
+    throw new Error('Could not transfer the product.');
+  }
 
   const { error: movementError } = await supabase.from('stock_movements').insert({
     org_id: profile.org_id,

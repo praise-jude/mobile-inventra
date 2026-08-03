@@ -1,3 +1,4 @@
+import { logError } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import type { UserRole } from '@/types/database';
 
@@ -32,8 +33,74 @@ export async function logAudit(input: AuditLogInput): Promise<void> {
       entity_label: input.entityLabel ?? null,
       new_value: input.newValue ?? null,
     });
-    if (error) console.error('[Royal Inventra] logAudit insert failed:', error);
+    if (error) logError({ feature: 'Audit', action: 'logAudit' }, 'audit_logs insert failed', error, { orgId: input.orgId, auditAction: input.action });
   } catch (err) {
-    console.error('[Royal Inventra] logAudit failed:', err);
+    logError({ feature: 'Audit', action: 'logAudit' }, 'logAudit threw', err, { orgId: input.orgId, auditAction: input.action });
+  }
+}
+
+// Mirrors Inventra/lib/actions/audit.ts's recordLogin — called after a
+// successful sign-in (src/app/(auth)/login.tsx). Web already tracked this;
+// mobile logins were previously invisible in the audit trail.
+export async function recordLogin(): Promise<void> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id, first_name, last_name, role')
+      .eq('id', user.id)
+      .single();
+    if (!profile) return;
+
+    await logAudit({
+      orgId: profile.org_id,
+      actorId: user.id,
+      actorName: `${profile.first_name} ${profile.last_name}`,
+      actorRole: profile.role,
+      action: 'user.login',
+      module: 'Auth',
+      entityType: 'profile',
+      entityId: user.id,
+      entityLabel: `${profile.first_name} ${profile.last_name}`,
+    });
+  } catch (err) {
+    logError({ feature: 'Auth', action: 'recordLogin' }, 'recordLogin failed', err);
+  }
+}
+
+// Mirrors Inventra/lib/actions/audit.ts's recordLogout — must run before
+// supabase.auth.signOut() tears down the session, while it's still valid
+// enough to attribute the entry to the right user.
+export async function recordLogout(): Promise<void> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id, first_name, last_name, role')
+      .eq('id', user.id)
+      .single();
+    if (!profile) return;
+
+    await logAudit({
+      orgId: profile.org_id,
+      actorId: user.id,
+      actorName: `${profile.first_name} ${profile.last_name}`,
+      actorRole: profile.role,
+      action: 'user.logout',
+      module: 'Auth',
+      entityType: 'profile',
+      entityId: user.id,
+      entityLabel: `${profile.first_name} ${profile.last_name}`,
+    });
+  } catch (err) {
+    logError({ feature: 'Auth', action: 'recordLogout' }, 'recordLogout failed', err);
   }
 }

@@ -5,6 +5,7 @@
 // silent RLS-denied no-op.
 import { logAudit } from '@/lib/actions/audit';
 import { canAddInvoice, UpgradeRequiredError } from '@/lib/entitlements';
+import { logError } from '@/lib/logger';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { CustomerInvoiceStatus } from '@/types/database';
@@ -78,7 +79,10 @@ export async function createInvoice(input: InvoiceInput): Promise<string> {
     })
     .select('id')
     .single();
-  if (error || !invoice) throw new Error('Could not create the invoice.');
+  if (error || !invoice) {
+    logError({ feature: 'Invoices', action: 'createInvoice' }, 'invoice insert failed', error);
+    throw new Error('Could not create the invoice.');
+  }
 
   const itemRows = input.items.map((i) => ({
     org_id: profile.org_id,

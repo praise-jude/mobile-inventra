@@ -8,6 +8,7 @@
 // actions/billing.ts's postToMobileBillingRoute).
 import { logAudit } from '@/lib/actions/audit';
 import { createNotification } from '@/lib/actions/notifications';
+import { logError } from '@/lib/logger';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
@@ -136,7 +137,10 @@ export async function approveMember(memberId: string): Promise<void> {
     .update({ status: 'active', approved_by: profile.id, approved_at: now })
     .eq('id', memberId)
     .eq('org_id', profile.org_id);
-  if (error) throw new Error('Could not approve this member.');
+  if (error) {
+    logError({ feature: 'Team', action: 'approveMember', orgId: profile.org_id }, 'member approve failed', error, { memberId });
+    throw new Error('Could not approve this member.');
+  }
 
   const { data: org } = await supabase.from('organizations').select('name').eq('id', profile.org_id).single();
   void createNotification({
@@ -177,7 +181,10 @@ export async function rejectMember(memberId: string, reason: (typeof REJECT_REAS
     .update({ rejected_at: new Date().toISOString(), rejected_reason: fullReason })
     .eq('id', memberId)
     .eq('org_id', profile.org_id);
-  if (error) throw new Error('Could not reject this member.');
+  if (error) {
+    logError({ feature: 'Team', action: 'rejectMember', orgId: profile.org_id }, 'member reject failed', error, { memberId });
+    throw new Error('Could not reject this member.');
+  }
 
   void createNotification({
     orgId: profile.org_id,

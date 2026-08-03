@@ -11,6 +11,7 @@
 //    instead of a spoofable client-reported value.
 import * as Linking from 'expo-linking';
 
+import { recordLogin, recordLogout } from '@/lib/actions/audit';
 import { currencyForCountry, timezoneFor } from '@/lib/geo/countries';
 import { deregisterPushToken } from '@/lib/actions/notifications';
 import { supabase } from '@/lib/supabase';
@@ -68,11 +69,14 @@ export async function registerAccount(input: SignupInput): Promise<RegisterAccou
 export async function signIn(email: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
+  void recordLogin();
 }
 
 export async function signOut(): Promise<void> {
-  // Must run before auth.signOut() tears down the session — deleting the
+  // Both must run before auth.signOut() tears down the session — recordLogout
+  // needs a valid session to attribute the entry, and deleting the
   // push_tokens row needs a valid auth.uid() for RLS.
+  await recordLogout();
   await deregisterPushToken();
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
