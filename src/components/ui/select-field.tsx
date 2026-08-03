@@ -18,12 +18,13 @@ interface SelectFieldProps {
   options: SelectOption[];
   onChange: (value: string) => void;
   searchable?: boolean;
+  disabled?: boolean;
 }
 
 // Same visual language as TextField, opening a searchable modal list instead
 // of an inline dropdown — the country list alone is 190+ entries, so a
 // native <select>-style inline menu isn't practical on mobile.
-export function SelectField({ label, error, value, placeholder, options, onChange, searchable }: SelectFieldProps) {
+export function SelectField({ label, error, value, placeholder, options, onChange, searchable, disabled }: SelectFieldProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -40,15 +41,16 @@ export function SelectField({ label, error, value, placeholder, options, onChang
     <View>
       {label && <Text className="mb-1.5 text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">{label}</Text>}
       <Pressable
-        onPress={() => setOpen(true)}
-        className={`h-[42px] w-full flex-row items-center justify-between rounded-[9px] border bg-surface px-[13px] dark:bg-surface-dark ${borderClass}`}
+        onPress={() => !disabled && setOpen(true)}
+        disabled={disabled}
+        className={`h-[42px] w-full flex-row items-center justify-between rounded-[9px] border bg-surface px-[13px] dark:bg-surface-dark ${borderClass} ${disabled ? 'opacity-60' : ''}`}
       >
         <Text
           className={`text-[14px] ${selected ? 'text-text dark:text-text-dark' : 'text-faint dark:text-faint-dark'}`}
         >
           {selected?.label ?? placeholder ?? 'Select…'}
         </Text>
-        <Text className="text-text-2 dark:text-text-2-dark">▾</Text>
+        {!disabled && <Text className="text-text-2 dark:text-text-2-dark">▾</Text>}
       </Pressable>
       {error && <Text className="mt-1.5 text-[12px] font-medium text-red dark:text-red-dark">{error}</Text>}
 

@@ -14,6 +14,7 @@ import { findProductByCode, searchProductsForPicker, type ProductPickerRow } fro
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency, useOrgTaxRate } from '@/lib/hooks/use-org';
 import { useWarehouses } from '@/lib/hooks/use-products';
 import { useQuery } from '@tanstack/react-query';
@@ -54,6 +55,12 @@ export default function NewSaleScreen() {
   const currency = useOrgCurrency();
   const taxRate = useOrgTaxRate();
   const warehousesQuery = useWarehouses();
+  const profileQuery = useMyProfile();
+  // Cashier's own branch, when they have one — locks the field below so
+  // their sales tag it automatically instead of leaving an easy-to-skip
+  // optional dropdown, mirroring Inventra/app/(app)/sales/new/page.tsx.
+  const lockedWarehouseId = profileQuery.data?.role === 'cashier' ? (profileQuery.data.branch_id ?? null) : null;
+  const effectiveWarehouseId = lockedWarehouseId ?? warehouseId;
 
   const searchQuery = useQuery({
     queryKey: ['product-picker', debouncedSearch],
@@ -120,7 +127,7 @@ export default function NewSaleScreen() {
     setError(null);
     try {
       const result = await recordSale({
-        warehouseId: warehouseId || undefined,
+        warehouseId: effectiveWarehouseId || undefined,
         items: cart.map((l) => ({ productId: l.productId, qty: l.qty, discountPct: l.discountPct })),
         paymentMethod,
         notes: notes || undefined,
@@ -268,11 +275,12 @@ export default function NewSaleScreen() {
         <View className="mt-6 gap-3.5">
           {(warehousesQuery.data ?? []).length > 0 && (
             <SelectField
-              label="Warehouse (optional)"
+              label={lockedWarehouseId ? 'Warehouse' : 'Warehouse (optional)'}
               placeholder="Select warehouse…"
-              value={warehouseId}
+              value={effectiveWarehouseId}
               options={(warehousesQuery.data ?? []).map((w) => ({ value: w.id, label: w.name }))}
               onChange={setWarehouseId}
+              disabled={!!lockedWarehouseId}
             />
           )}
           <SelectField label="Payment method" value={paymentMethod} options={PAYMENT_OPTIONS} onChange={(v) => setPaymentMethod(v as PaymentMethod)} />

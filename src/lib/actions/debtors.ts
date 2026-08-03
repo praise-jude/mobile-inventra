@@ -26,10 +26,16 @@ export async function createDebtor(input: DebtorInput): Promise<void> {
   if (!customerName) throw new Error('Customer name is required.');
   if (input.amountOwed < 0) throw new Error("Amount owed can't be negative.");
 
+  // Tags the record with whatever branch the creating user is at (if any) —
+  // not restricted to Cashier/Warehouse roles, mirrors
+  // Inventra/lib/actions/debtors.ts's createDebtor exactly. Cashier/
+  // Warehouse read access to debtors is branch-scoped by RLS (see
+  // 20260803183000_branch_scope_debtors.sql on web, same shared database).
   const { data: debtor, error } = await supabase
     .from('debtors')
     .insert({
       org_id: profile.org_id,
+      warehouse_id: profile.branch_id,
       customer_name: customerName,
       phone: input.phone?.trim() || null,
       email: input.email?.trim() || null,

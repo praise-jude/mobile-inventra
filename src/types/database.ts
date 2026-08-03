@@ -185,6 +185,7 @@ export type DebtorStatus = 'pending' | 'partially_paid' | 'paid' | 'overdue' | '
 export type Debtor = {
   id: string;
   org_id: string;
+  warehouse_id: string | null;
   customer_name: string;
   phone: string | null;
   email: string | null;
