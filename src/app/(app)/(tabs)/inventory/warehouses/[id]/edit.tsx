@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
@@ -10,7 +11,9 @@ import { TextField } from '@/components/ui/text-field';
 import {
   archiveWarehouse,
   deleteWarehouse,
+  generateBranchCode,
   reactivateWarehouse,
+  revokeBranchCode,
   transferWarehouseStock,
   updateWarehouse,
   type WarehouseInput,
@@ -75,6 +78,8 @@ function WarehouseEditForm({
   const [transferProductId, setTransferProductId] = useState<string | null>(null);
   const [transferTo, setTransferTo] = useState('');
   const [transferring, setTransferring] = useState(false);
+  const [codeBusy, setCodeBusy] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const managerOptions = useMemo(
     () => (teamQuery.data ?? []).map((m) => ({ label: `${m.name} (${m.role})`, value: m.id })),
@@ -142,6 +147,51 @@ function WarehouseEditForm({
     ]);
   }
 
+  async function handleGenerateCode() {
+    setCodeBusy(true);
+    try {
+      await generateBranchCode(id);
+      haptics.success();
+      invalidate();
+    } catch (err) {
+      haptics.warning();
+      notifyAlert('Error', err instanceof Error ? err.message : 'Could not generate a signup code.');
+    } finally {
+      setCodeBusy(false);
+    }
+  }
+
+  function handleRevokeCode() {
+    confirmAlert('Revoke this signup code?', 'Anyone still holding it will no longer be able to join this branch with it.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke',
+        style: 'destructive',
+        onPress: async () => {
+          setCodeBusy(true);
+          try {
+            await revokeBranchCode(id);
+            haptics.success();
+            invalidate();
+          } catch (err) {
+            haptics.warning();
+            notifyAlert('Error', err instanceof Error ? err.message : 'Could not revoke the signup code.');
+          } finally {
+            setCodeBusy(false);
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleCopyCode() {
+    if (!warehouse.branchCode) return;
+    await Clipboard.setStringAsync(warehouse.branchCode);
+    haptics.success();
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  }
+
   async function handleTransfer() {
     if (!transferProductId || !transferTo) return;
     setTransferring(true);
@@ -207,6 +257,40 @@ function WarehouseEditForm({
               <Button variant="secondary" onPress={handleDelete} className="flex-1">
                 Delete
               </Button>
+            </View>
+
+            <View className="mt-3 gap-2 rounded-[10px] border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="text-[13px] font-bold text-text dark:text-text-dark">Signup code</Text>
+              <Text className="text-[12px] text-muted dark:text-muted-dark">
+                Anyone with this code can join this branch directly as a manager — no approval needed.
+              </Text>
+              {warehouse.branchCode ? (
+                <>
+                  <Pressable
+                    onPress={handleCopyCode}
+                    className="flex-row items-center justify-between rounded-[8px] border border-border bg-bg px-3 py-2.5 dark:border-border-dark dark:bg-bg-dark"
+                  >
+                    <Text className="font-mono text-[15px] font-bold tracking-widest text-text dark:text-text-dark">
+                      {warehouse.branchCode}
+                    </Text>
+                    <Text className="text-[12px] font-semibold text-accent-text dark:text-accent-text-dark">
+                      {codeCopied ? 'Copied' : 'Copy'}
+                    </Text>
+                  </Pressable>
+                  <View className="flex-row gap-2.5">
+                    <Button variant="secondary" loading={codeBusy} onPress={handleGenerateCode} className="flex-1">
+                      Regenerate
+                    </Button>
+                    <Button variant="secondary" loading={codeBusy} onPress={handleRevokeCode} className="flex-1">
+                      Revoke
+                    </Button>
+                  </View>
+                </>
+              ) : (
+                <Button variant="secondary" loading={codeBusy} onPress={handleGenerateCode}>
+                  Generate signup code
+                </Button>
+              )}
             </View>
           </>
         ) : (

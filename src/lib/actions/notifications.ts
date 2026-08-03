@@ -1,7 +1,6 @@
 // Mirrors Inventra/lib/actions/notifications.ts +
 // lib/notifications-service.ts. Mobile reads its own feed and creates
-// notifications for other org members directly (called from
-// src/lib/actions/team.ts's approveMember/rejectMember) — RLS
+// notifications for other org members directly — RLS
 // (notifications_insert_org) is the real gate, no bearer-token route
 // needed, same as audit_logs.
 import * as Device from 'expo-device';

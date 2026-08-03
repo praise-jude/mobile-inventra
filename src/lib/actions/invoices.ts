@@ -156,9 +156,8 @@ export async function deleteInvoice(id: string): Promise<void> {
 }
 
 // Cloud Storage archival needs a Google service-account key, which this
-// bundle can never hold — same reason invite/resendInvite/removeMember in
-// actions/team.ts go through app/api/mobile/team/* instead of talking to
-// Supabase directly. These two hit the matching
+// bundle can never hold, so these two go through a bearer-token web API
+// route instead of talking to Supabase directly — the matching
 // app/api/mobile/invoices/[id]/{archive-pdf,pdf-url} routes.
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 

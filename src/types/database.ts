@@ -146,6 +146,8 @@ export type Warehouse = {
   state: string | null;
   phone: string | null;
   status: WarehouseStatus;
+  branch_code: string | null;
+  branch_code_expires_at: string | null;
   created_at: string;
 };
 
@@ -621,9 +623,8 @@ export type MfaRecoveryCode = {
 
 // In-app notification feed — mirrors Inventra/lib/notifications-service.ts.
 // Mobile both reads its own feed and inserts notifications for other org
-// members directly (approve/reject in src/lib/actions/team.ts), same as
-// audit_logs — RLS (notifications_insert_org) is the real gate, not a
-// bearer-token route.
+// members directly, same as audit_logs — RLS (notifications_insert_org) is
+// the real gate, not a bearer-token route.
 export type NotificationRow = {
   id: string;
   org_id: string;
@@ -762,7 +763,12 @@ export type Database = {
       >;
       warehouses: TableDef<
         Warehouse,
-        Omit<Warehouse, 'id' | 'created_at' | 'status'> & { id?: string; status?: WarehouseStatus },
+        Omit<Warehouse, 'id' | 'created_at' | 'status' | 'branch_code' | 'branch_code_expires_at'> & {
+          id?: string;
+          status?: WarehouseStatus;
+          branch_code?: string | null;
+          branch_code_expires_at?: string | null;
+        },
         Partial<Omit<Warehouse, 'id' | 'org_id' | 'created_at'>>
       >;
       daily_cash_registers: TableDef<
@@ -1010,6 +1016,10 @@ export type Database = {
       has_permission: {
         Args: { p_module: string; p_action: string };
         Returns: boolean;
+      };
+      generate_branch_code: {
+        Args: Record<string, never>;
+        Returns: string;
       };
     };
     Enums: Record<string, never>;

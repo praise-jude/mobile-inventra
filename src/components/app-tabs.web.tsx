@@ -25,15 +25,14 @@ const TABS = [
 // `Tabs` (expo-router/ui) only knows how to route to segments registered as
 // a TabTrigger inside TabList — a `router.push('/reports')` to any other
 // top-level (app)/ route is silently swallowed (stays on the current tab)
-// because the underlying ExpoTabRouter has no entry for it. These two are
-// reachable via in-app navigation (Dashboard's Reports card, Settings'
-// Team row) but shouldn't show as bottom-bar buttons, so they're registered
-// with a zero-size trigger instead of a visible one — same intent as
+// because the underlying ExpoTabRouter has no entry for it. These are
+// reachable via in-app navigation (Dashboard's Reports card, etc.) but
+// shouldn't show as bottom-bar buttons, so they're registered with a
+// zero-size trigger instead of a visible one — same intent as
 // NativeTabs.Trigger's first-class `hidden` prop in app-tabs.tsx, which
 // expo-router/ui has no equivalent for.
 const HIDDEN_TABS = [
   { name: 'reports', href: '/reports' },
-  { name: 'team', href: '/team' },
   { name: 'notifications', href: '/notifications' },
 ] as const;
 

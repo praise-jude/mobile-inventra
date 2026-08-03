@@ -17,7 +17,7 @@ import { deregisterPushToken } from '@/lib/actions/notifications';
 import { supabase } from '@/lib/supabase';
 import { CURRENT_TERMS_VERSION } from '@/lib/terms';
 import type { Organization } from '@/types/database';
-import type { CompleteOnboardingInput, SignupInput } from '@/lib/validation/auth';
+import type { CompleteOnboardingInput, JoinBranchInput, SignupInput } from '@/lib/validation/auth';
 
 export type RegisterAccountResult = { ok: true; hasSession: boolean } | { ok: false; error: string };
 
@@ -63,6 +63,48 @@ export async function registerAccount(input: SignupInput): Promise<RegisterAccou
   });
 
   if (error) return { ok: false, error: error.message };
+  return { ok: true, hasSession: !!data.session };
+}
+
+// The self-service replacement for the old Team invite flow — much lighter
+// than registerAccount() above (no business/country fields, since those
+// come from the branch's existing org) because this joins an EXISTING
+// org/branch rather than creating one. The actual org_id/branch_id
+// resolution happens server-side in the on_auth_user_created trigger (see
+// 20260803200000_branch_code_signup.sql), which looks the code up itself
+// rather than trusting anything the client claims — this action only
+// forwards what the user typed, never an org/branch id. Mirrors
+// Inventra/lib/actions/auth.ts's joinBranchAsManager.
+export async function joinBranchAsManager(input: JoinBranchInput): Promise<RegisterAccountResult> {
+  const fullName = input.fullName.trim();
+  const email = input.email.trim().toLowerCase();
+  const branchCode = input.branchCode.trim().toUpperCase();
+
+  const [firstName, ...rest] = fullName.split(/\s+/);
+  const lastName = rest.join(' ') || undefined;
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password: input.password,
+    options: {
+      emailRedirectTo: Linking.createURL('callback'),
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        branch_code: branchCode,
+        terms_accepted: true,
+        terms_version: CURRENT_TERMS_VERSION,
+        terms_accepted_ip: null,
+      },
+    },
+  });
+
+  // "Invalid or expired branch code." raised by the trigger surfaces here as
+  // a generic auth error — checked for directly so the message stays useful.
+  if (error) {
+    const message = error.message?.includes('branch code') ? 'Invalid or expired branch code.' : error.message;
+    return { ok: false, error: message };
+  }
   return { ok: true, hasSession: !!data.session };
 }
 

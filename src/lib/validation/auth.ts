@@ -76,6 +76,21 @@ export const signupSchema = z
 
 export type SignupInput = z.infer<typeof signupSchema>;
 
+// Mirrors Inventra/lib/actions/auth.ts's JoinBranchInput — much lighter than
+// signupSchema above since this joins an EXISTING org/branch (the code
+// resolves org/branch/role server-side) rather than creating one.
+export const joinBranchSchema = z.object({
+  fullName: fullNameSchema,
+  email: emailSchema,
+  password: passwordSchema,
+  branchCode: z.string().trim().min(1, 'Branch code is required.'),
+  termsAccepted: z.boolean().refine((v) => v, {
+    message: 'You must accept the Terms & Conditions and Privacy Policy.',
+  }),
+});
+
+export type JoinBranchInput = z.infer<typeof joinBranchSchema>;
+
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'Password is required.'),

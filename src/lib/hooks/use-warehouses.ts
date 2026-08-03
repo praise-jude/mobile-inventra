@@ -17,6 +17,10 @@ export interface WarehouseOverviewRow {
   skuCount: number;
   stockValue: number;
   utilizationPct: number;
+  // Branch signup code — self-service replacement for the old Team invite
+  // flow (see lib/actions/warehouses.ts's generateBranchCode).
+  branchCode: string | null;
+  branchCodeExpiresAt: string | null;
 }
 
 interface StockSummaryRow {
@@ -36,7 +40,9 @@ export function useWarehousesOverview() {
       const [{ data: warehouses, error: whError }, { data: summary, error: summaryError }] = await Promise.all([
         supabase
           .from('warehouses')
-          .select('id, name, address, country, state, phone, status, capacity, manager_profile_id, profiles!warehouses_manager_profile_id_fkey(first_name, last_name)')
+          .select(
+            'id, name, address, country, state, phone, status, capacity, manager_profile_id, branch_code, branch_code_expires_at, profiles!warehouses_manager_profile_id_fkey(first_name, last_name)',
+          )
           .order('name'),
         supabase.rpc('get_warehouse_stock_summary'),
       ]);
@@ -63,6 +69,8 @@ export function useWarehousesOverview() {
           skuCount: s?.sku_count ?? 0,
           stockValue: Number(s?.stock_value ?? 0),
           utilizationPct: w.capacity ? Math.min(100, Math.round((totalUnits / w.capacity) * 100)) : 0,
+          branchCode: w.branch_code,
+          branchCodeExpiresAt: w.branch_code_expires_at,
         };
       });
     },

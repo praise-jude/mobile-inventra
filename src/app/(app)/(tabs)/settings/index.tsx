@@ -7,17 +7,15 @@ import { signOut } from '@/lib/actions/auth';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { usePendingApprovalsCount } from '@/lib/hooks/use-team';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 
 // Security (MFA) is every role's own account setting, unconditional —
 // mirrors Inventra/app/(app)/account/security/page.tsx's comment: "every
 // role needs to reach this page", deliberately not under the admin-tier
-// gate the rest of /settings uses. Team is Manager-tier+ (a Manager can
-// invite Staff and approve/reject them, restricted further inside the
-// Team screen itself) — everything else here is business config and
-// stays Admin-tier+, mirroring Sidebar.tsx's managerOnly/adminOnly split
-// on web.
+// gate the rest of /settings uses. Team Management (invites/approvals/role
+// UI) was removed in favor of branch-code signup — Branches (below, in
+// ADMIN_ROWS, same admin tier Inventra/components/app/Sidebar.tsx uses for
+// its replacement) is where an Owner/Admin generates a branch's signup code.
 const ALWAYS_ROWS = [
   { href: '/settings/appearance' as const, icon: '🎨', label: 'Appearance', description: 'Light, dark, or match your device' },
   { href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' },
@@ -32,7 +30,6 @@ const ALWAYS_ROWS = [
 // rows below, so it gets its own bucket rather than joining MANAGER_ROWS.
 const SALES_ROWS = [{ href: '/invoices' as const, icon: '📄', label: 'Invoices', description: 'Create and track customer invoices' }];
 const MANAGER_ROWS = [
-  { href: '/team' as const, icon: '👥', label: 'Team', description: 'Members, roles, invites, approvals' },
   { href: '/approvals' as const, icon: '📝', label: 'Approval Requests', description: 'Review pending discounts, voids, and price changes' },
   { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
   { href: '/expenses' as const, icon: '💸', label: 'Expenses', description: 'Log rent, salary, transport and other spend' },
@@ -40,6 +37,7 @@ const MANAGER_ROWS = [
 ];
 const ADMIN_ROWS = [
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
+  { href: '/inventory/warehouses' as const, icon: '👥', label: 'Branches', description: 'Manage branches and generate signup codes' },
   { href: '/settings/roles' as const, icon: '🛡️', label: 'Roles', description: 'Customize what Manager, Cashier & Warehouse can do' },
   { href: '/settings/notifications' as const, icon: '🔔', label: 'Notifications', description: 'Low stock, expiring products, weekly digest' },
   { href: '/settings/printing' as const, icon: '🖨️', label: 'Receipts & Printing', description: 'Paper size, auto-print, receipt footer' },
@@ -58,13 +56,6 @@ export default function SettingsScreen() {
 
   const isWarehouse = profileQuery.data?.role === 'warehouse';
 
-  // Only fetched for the Team row's pending-approvals pill — mirrors
-  // (tabs)/index.tsx's Dashboard card scoping exactly (Owner/Admin see the
-  // whole org's queue, a Manager only their own branch's).
-  const profile = profileQuery.data;
-  const pendingApprovalsCountQuery = usePendingApprovalsCount(profile?.role, profile?.branch_id);
-  const pendingApprovalsCount = isManagerUp ? pendingApprovalsCountQuery.data ?? 0 : 0;
-
   function Row(row: {
     href:
       | '/settings/appearance'
@@ -72,12 +63,12 @@ export default function SettingsScreen() {
       | '/support'
       | '/cash-register'
       | '/invoices'
-      | '/team'
       | '/approvals'
       | '/customers'
       | '/expenses'
       | '/supply-records'
       | '/settings/general'
+      | '/inventory/warehouses'
       | '/settings/roles'
       | '/settings/notifications'
       | '/settings/printing'
@@ -123,8 +114,7 @@ export default function SettingsScreen() {
         <View className="mt-6 gap-2.5">
           {ALWAYS_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {!isWarehouse && SALES_ROWS.map((row) => <Row key={row.href} {...row} />)}
-          {isManagerUp &&
-            MANAGER_ROWS.map((row) => <Row key={row.href} {...row} badge={row.href === '/team' ? pendingApprovalsCount : undefined} />)}
+          {isManagerUp && MANAGER_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {isAdmin && ADMIN_ROWS.map((row) => <Row key={row.href} {...row} />)}
         </View>
 

@@ -23,7 +23,7 @@ import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
-import { useActiveTeamMembers, usePendingApprovalsCount } from '@/lib/hooks/use-team';
+import { useActiveTeamMembers } from '@/lib/hooks/use-team';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 import { isManagerRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
@@ -219,7 +219,6 @@ export default function DashboardScreen() {
   });
   const reportsPermissionQuery = useHasPermission('reports', 'view');
   const activeTeamMembersQuery = useActiveTeamMembers();
-  const pendingApprovalsCountQuery = usePendingApprovalsCount(coreQuery.data?.profile.role, coreQuery.data?.profile.branch_id);
   // Falls back to the device's own timezone before the org loads — only
   // ever rendered once coreQuery.data is available anyway.
   const liveTime = useLiveClock(coreQuery.data?.org.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone);
@@ -265,12 +264,6 @@ export default function DashboardScreen() {
   const greeting = greetingFor(org.timezone);
   const today = formatTodayHeader(org.timezone);
   const totalStock = stockHealth.reduce((sum, s) => (s.label === 'expiring' ? sum : sum + Number(s.count)), 0);
-  // Scoped to what this viewer can actually approve — mirrors
-  // Inventra/lib/queries/team.ts's getPendingApprovalsCount() and the
-  // branch-scoped RLS/trigger it's built against: Owner/Admin see the
-  // whole org's queue, a Manager only their own branch's, Cashier/
-  // Warehouse always 0.
-  const pendingApprovalsCount = pendingApprovalsCountQuery.data ?? 0;
 
   const kpiCards = [
     {
@@ -464,24 +457,6 @@ export default function DashboardScreen() {
                 </Text>
               </View>
             )}
-          </Pressable>
-        )}
-
-        {isManagerTier && pendingApprovalsCount > 0 && (
-          <Pressable
-            onPress={() => router.push('/team')}
-            className="mt-4 flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
-          >
-            <View className="flex-row items-center gap-3">
-              <View className="h-9 w-9 items-center justify-center rounded-[9px] bg-sky-weak dark:bg-sky-weak-dark">
-                <Text className="text-[16px]">✅</Text>
-              </View>
-              <View>
-                <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">Pending Approvals ({pendingApprovalsCount})</Text>
-                <Text className="text-[11px] text-muted dark:text-muted-dark">Team members waiting for your approval</Text>
-              </View>
-            </View>
-            <Text className="text-[12.5px] font-semibold text-accent-text dark:text-accent-text-dark">Review →</Text>
           </Pressable>
         )}
 
