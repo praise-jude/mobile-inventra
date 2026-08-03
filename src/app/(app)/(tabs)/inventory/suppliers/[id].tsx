@@ -12,7 +12,7 @@ import { confirmAlert, notifyAlert } from '@/lib/confirm';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useSupplierDetail } from '@/lib/hooks/use-suppliers';
 import { isManagerRole } from '@/lib/roles';
 

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, type PropsWithChildren, useContext, useEffect, useState } from 'react';
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 const INTRO_SEEN_KEY = 'ri_intro_seen_v1';
 
@@ -27,12 +27,14 @@ export function IntroSeenProvider({ children }: PropsWithChildren) {
     });
   }, []);
 
-  function markSeen() {
+  const markSeen = useCallback(() => {
     setSeen(true);
     void AsyncStorage.setItem(INTRO_SEEN_KEY, '1');
-  }
+  }, []);
 
-  return <IntroSeenContext.Provider value={{ seen, markSeen }}>{children}</IntroSeenContext.Provider>;
+  const value = useMemo(() => ({ seen, markSeen }), [seen, markSeen]);
+
+  return <IntroSeenContext.Provider value={value}>{children}</IntroSeenContext.Provider>;
 }
 
 export function useIntroSeen(): IntroSeenContextValue {

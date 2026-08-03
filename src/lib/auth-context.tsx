@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, type PropsWithChildren, useContext, useEffect, useState } from 'react';
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 import type { AccessGateState } from '@/types/database';
@@ -109,24 +109,31 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }
   const awaitingApproval = !!session && !needsMfaStepUp && !needsOnboarding && gate?.member_status === 'awaiting_approval';
 
-  return (
-    <AuthContext.Provider
-      value={{
-        session,
-        initializing,
-        gate,
-        gateLoading: gateQuery.isLoading,
-        aalLoading: aalQuery.isLoading,
-        needsMfaStepUp,
-        needsOnboarding,
-        awaitingApproval,
-        refetchGate: () => void gateQuery.refetch(),
-        refetchAal: () => void aalQuery.refetch(),
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  // gateQuery/aalQuery are new objects every render (useQuery's return value
+  // isn't referentially stable) but their .refetch function is, so depending
+  // on the whole query object here would defeat the memoization below.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const refetchGate = useCallback(() => void gateQuery.refetch(), [gateQuery.refetch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const refetchAal = useCallback(() => void aalQuery.refetch(), [aalQuery.refetch]);
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
+      session,
+      initializing,
+      gate,
+      gateLoading: gateQuery.isLoading,
+      aalLoading: aalQuery.isLoading,
+      needsMfaStepUp,
+      needsOnboarding,
+      awaitingApproval,
+      refetchGate,
+      refetchAal,
+    }),
+    [session, initializing, gate, gateQuery.isLoading, aalQuery.isLoading, needsMfaStepUp, needsOnboarding, awaitingApproval, refetchGate, refetchAal],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

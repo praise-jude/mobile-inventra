@@ -7,11 +7,12 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useInvoicesList, useInvoicesTotals, type InvoiceRow } from '@/lib/hooks/use-invoices';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 
 const STATUS_STYLE: Record<InvoiceRow['status'], { label: string; className: string }> = {
   draft: { label: 'Draft', className: 'text-muted dark:text-muted-dark bg-border-2 dark:bg-border-2-dark' },
@@ -90,7 +91,7 @@ export default function InvoicesScreen() {
               value={search}
               onChangeText={setSearch}
               placeholder="Search by customer or invoice number…"
-              placeholderTextColor="#aab2c4"
+              placeholderTextColor={PlaceholderTextColor}
               className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
             />
             <Button onPress={() => router.push('/invoices/new')} className="self-start px-4">

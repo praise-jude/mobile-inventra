@@ -13,18 +13,6 @@ import type { NotificationRow } from '@/types/database';
 
 export type { NotificationRow };
 
-export async function getNotifications(): Promise<NotificationRow[]> {
-  const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(100);
-  if (error) throw new Error('Could not load notifications.');
-  return data ?? [];
-}
-
-export async function getUnreadNotificationCount(): Promise<number> {
-  const { count, error } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null);
-  if (error) return 0;
-  return count ?? 0;
-}
-
 export async function markNotificationRead(id: string): Promise<void> {
   await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id);
 }

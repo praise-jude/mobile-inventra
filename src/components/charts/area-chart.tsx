@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 
 import { ChartColors } from '@/constants/theme';
@@ -14,7 +15,7 @@ interface Series {
 // every-other-month labels), rebuilt with react-native-svg elements since
 // that component injects a raw SVG string via dangerouslySetInnerHTML,
 // which has no RN equivalent.
-export function AreaChart({
+export const AreaChart = memo(function AreaChart({
   months,
   series,
   idPrefix = 'ac',
@@ -89,4 +90,4 @@ export function AreaChart({
       )}
     </Svg>
   );
-}
+});

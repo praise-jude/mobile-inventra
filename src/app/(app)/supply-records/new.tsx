@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { createSupplyRecord } from '@/lib/actions/supply-records';
 import { searchProductsForPicker, type ProductPickerRow } from '@/lib/actions/inventory';
 import { formatMoney } from '@/lib/format';
@@ -31,6 +32,7 @@ function todayIso(): string {
 // product search to build a line-item list, then a supplier/branch section.
 export default function NewSupplyRecordScreen() {
   const currency = useOrgCurrency();
+  const queryClient = useQueryClient();
   const warehouseOptionsQuery = useWarehouseOptions();
   const suppliersQuery = useSuppliersDetailed();
 
@@ -117,6 +119,8 @@ export default function NewSupplyRecordScreen() {
         items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, unitCost: l.unitCost })),
       });
       haptics.success();
+      queryClient.invalidateQueries({ queryKey: ['supply-records-list'] });
+      queryClient.invalidateQueries({ queryKey: ['supply-records-totals'] });
       router.replace(`/supply-records/${id}`);
     } catch (err) {
       haptics.warning();
@@ -141,7 +145,7 @@ export default function NewSupplyRecordScreen() {
           value={search}
           onChangeText={setSearch}
           placeholder="Search product name or SKU…"
-          placeholderTextColor="#aab2c4"
+          placeholderTextColor={PlaceholderTextColor}
           className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         />
         {search.trim().length > 0 && (

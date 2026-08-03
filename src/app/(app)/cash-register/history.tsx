@@ -10,11 +10,12 @@ import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { notifyAlert } from '@/lib/confirm';
 import { useCashRegisterHistory, type CashRegisterRow } from '@/lib/hooks/use-cash-register';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 
 function escapeHtml(value: string): string {
@@ -98,14 +99,14 @@ export default function CashRegisterHistoryScreen() {
             value={from}
             onChangeText={setFrom}
             placeholder="From (YYYY-MM-DD)"
-            placeholderTextColor="#aab2c4"
+            placeholderTextColor={PlaceholderTextColor}
             className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
           />
           <TextInput
             value={to}
             onChangeText={setTo}
             placeholder="To (YYYY-MM-DD)"
-            placeholderTextColor="#aab2c4"
+            placeholderTextColor={PlaceholderTextColor}
             className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
           />
         </View>
@@ -113,7 +114,7 @@ export default function CashRegisterHistoryScreen() {
           value={search}
           onChangeText={setSearch}
           placeholder="Search…"
-          placeholderTextColor="#aab2c4"
+          placeholderTextColor={PlaceholderTextColor}
           className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         />
         <Button variant="secondary" loading={sharing} onPress={handleShare} disabled={filtered.length === 0}>

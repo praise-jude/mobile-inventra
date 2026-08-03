@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 
 export interface SelectOption {
@@ -65,7 +66,7 @@ export function SelectField({ label, error, value, placeholder, options, onChang
                 value={query}
                 onChangeText={setQuery}
                 placeholder="Search…"
-                placeholderTextColor="#aab2c4"
+                placeholderTextColor={PlaceholderTextColor}
                 className="h-[42px] w-full rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
               />
             </View>

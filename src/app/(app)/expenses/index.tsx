@@ -14,7 +14,7 @@ import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { CATEGORY_LABEL, useExpenseCategoryBreakdown, useExpensesTotals, useRecentExpenses, type ExpenseRow } from '@/lib/hooks/use-expenses';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { SelectField } from '@/components/ui/select-field';

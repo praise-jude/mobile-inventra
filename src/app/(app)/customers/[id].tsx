@@ -13,7 +13,7 @@ import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebtorDetail, useDebtorsTotals } from '@/lib/hooks/use-debtors';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { isAdminRole } from '@/lib/roles';
 
 // Merges Inventra/components/debtors/DebtorsClient.tsx's row-expand detail,
@@ -38,7 +38,8 @@ export default function CustomerDetailScreen() {
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['debtor-detail', id] });
-    queryClient.invalidateQueries({ queryKey: ['debtors-overview'] });
+    queryClient.invalidateQueries({ queryKey: ['debtors-totals'] });
+    queryClient.invalidateQueries({ queryKey: ['debtors-list'] });
   }
 
   function startEdit() {
@@ -101,6 +102,7 @@ export default function CustomerDetailScreen() {
           try {
             await deleteDebtor(id);
             haptics.success();
+            invalidate();
             router.back();
           } catch (err) {
             haptics.warning();

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColorScheme as useNativeWindColorScheme } from 'nativewind';
-import { createContext, type PropsWithChildren, useContext, useEffect, useState } from 'react';
+import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -39,13 +39,18 @@ export function ThemePreferenceProvider({ children }: PropsWithChildren) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function setPreference(value: ThemePreference) {
-    setPreferenceState(value);
-    setColorScheme(value);
-    void AsyncStorage.setItem(THEME_PREFERENCE_KEY, value);
-  }
+  const setPreference = useCallback(
+    (value: ThemePreference) => {
+      setPreferenceState(value);
+      setColorScheme(value);
+      void AsyncStorage.setItem(THEME_PREFERENCE_KEY, value);
+    },
+    [setColorScheme],
+  );
 
-  return <ThemePreferenceContext.Provider value={{ preference, setPreference }}>{children}</ThemePreferenceContext.Provider>;
+  const value = useMemo(() => ({ preference, setPreference }), [preference, setPreference]);
+
+  return <ThemePreferenceContext.Provider value={value}>{children}</ThemePreferenceContext.Provider>;
 }
 
 export function useThemePreference(): ThemePreferenceContextValue {

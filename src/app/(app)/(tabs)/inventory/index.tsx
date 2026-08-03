@@ -10,13 +10,14 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { SelectField } from '@/components/ui/select-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { importProductsCsv, type ImportProductRow } from '@/lib/actions/products';
 import { notifyAlert } from '@/lib/confirm';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useCategories, useProducts, useSuppliers, useWarehouses, type ProductSearchRow } from '@/lib/hooks/use-products';
 import { parseSmartQuery } from '@/lib/smart-query';
 import type { ProductStatus } from '@/types/database';
@@ -218,7 +219,7 @@ export default function InventoryScreen() {
           value={search}
           onChangeText={setSearch}
           placeholder="Search name, SKU, barcode…"
-          placeholderTextColor="#aab2c4"
+          placeholderTextColor={PlaceholderTextColor}
           className="mt-3 h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         />
 
@@ -300,7 +301,7 @@ export default function InventoryScreen() {
                   onChangeText={setMinPrice}
                   keyboardType="numeric"
                   placeholder="0"
-                  placeholderTextColor="#aab2c4"
+                  placeholderTextColor={PlaceholderTextColor}
                   className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
                 />
               </View>
@@ -311,7 +312,7 @@ export default function InventoryScreen() {
                   onChangeText={setMaxPrice}
                   keyboardType="numeric"
                   placeholder="Any"
-                  placeholderTextColor="#aab2c4"
+                  placeholderTextColor={PlaceholderTextColor}
                   className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
                 />
               </View>
@@ -324,7 +325,7 @@ export default function InventoryScreen() {
                   onChangeText={setMinMargin}
                   keyboardType="numeric"
                   placeholder="0"
-                  placeholderTextColor="#aab2c4"
+                  placeholderTextColor={PlaceholderTextColor}
                   className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
                 />
               </View>
@@ -335,7 +336,7 @@ export default function InventoryScreen() {
                   onChangeText={setMaxMargin}
                   keyboardType="numeric"
                   placeholder="Any"
-                  placeholderTextColor="#aab2c4"
+                  placeholderTextColor={PlaceholderTextColor}
                   className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
                 />
               </View>

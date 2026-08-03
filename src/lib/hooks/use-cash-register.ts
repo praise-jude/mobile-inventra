@@ -26,7 +26,28 @@ export interface CashRegisterRow {
   closedAt: string | null;
 }
 
-function mapRow(r: any): CashRegisterRow {
+interface CashRegisterRawRow {
+  id: string;
+  warehouse_id: string;
+  business_date: string;
+  status: CashRegisterStatus;
+  money_at_hand: number | string;
+  money_in_purse: number | string;
+  opening_balance: number | string;
+  cash_sales: number | string | null;
+  other_cash_income: number | string;
+  cash_expenses: number | string;
+  cash_withdrawals: number | string;
+  expected_closing_balance: number | string | null;
+  actual_cash_count: number | string | null;
+  difference: number | string | null;
+  notes: string | null;
+  closed_at: string | null;
+  warehouses: { name: string } | null;
+  closed_by_profile: { first_name: string; last_name: string } | null;
+}
+
+function mapRow(r: CashRegisterRawRow): CashRegisterRow {
   return {
     id: r.id,
     warehouseId: r.warehouse_id,

@@ -1,5 +1,7 @@
+import { memo, useMemo } from 'react';
 import { Text, View } from 'react-native';
 
+import { timeAgo } from '@/lib/format';
 import { usePresence } from '@/lib/presence-context';
 import type { TeamMemberRow } from '@/lib/hooks/use-team';
 
@@ -11,31 +13,26 @@ const ROLE_LABEL: Record<string, string> = {
   warehouse: 'Warehouse',
 };
 
-function timeAgo(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.round(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} hr ago`;
-  return `${Math.round(hrs / 24)}d ago`;
-}
-
 // Mirrors Inventra/components/team/TeamPresenceCard.tsx — same online/
 // offline split, same role-breakdown grouping for online members, same
 // "last seen" list for offline ones, sharing the same Realtime presence
 // channel via usePresence() (src/lib/presence-context.tsx) so web and
 // mobile sessions in the same org see each other here.
-export function TeamPresenceCard({ members }: { members: TeamMemberRow[] }) {
+export const TeamPresenceCard = memo(function TeamPresenceCard({ members }: { members: TeamMemberRow[] }) {
   const { online } = usePresence();
-  const onlineIds = new Set(online.map((u) => u.userId));
-  const activeMembers = members.filter((m) => m.status === 'active');
-  const offline = activeMembers.filter((m) => !onlineIds.has(m.id));
 
-  const onlineByRole = new Map<string, typeof online>();
-  for (const u of online) {
-    onlineByRole.set(u.role, [...(onlineByRole.get(u.role) ?? []), u]);
-  }
+  const offline = useMemo(() => {
+    const onlineIds = new Set(online.map((u) => u.userId));
+    return members.filter((m) => m.status === 'active' && !onlineIds.has(m.id));
+  }, [members, online]);
+
+  const onlineByRole = useMemo(() => {
+    const byRole = new Map<string, typeof online>();
+    for (const u of online) {
+      byRole.set(u.role, [...(byRole.get(u.role) ?? []), u]);
+    }
+    return byRole;
+  }, [online]);
 
   return (
     <View className="rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
@@ -97,4 +94,4 @@ export function TeamPresenceCard({ members }: { members: TeamMemberRow[] }) {
       )}
     </View>
   );
-}
+});

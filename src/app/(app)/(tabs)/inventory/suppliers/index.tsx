@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useSuppliersDetailed } from '@/lib/hooks/use-suppliers';
@@ -41,7 +42,7 @@ export default function SuppliersScreen() {
           value={search}
           onChangeText={setSearch}
           placeholder="Search suppliers…"
-          placeholderTextColor="#aab2c4"
+          placeholderTextColor={PlaceholderTextColor}
           className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         />
         {canManage && (

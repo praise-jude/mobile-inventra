@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,12 +8,13 @@ import { ErrorState } from '@/components/error-state';
 import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { Button } from '@/components/ui/button';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { formatMoney } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useDebtorsList, useDebtorsTotals, type CustomerSegment, type DebtorRow } from '@/lib/hooks/use-debtors';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 
 const STATUS_STYLE: Record<DebtorRow['status'], { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'text-sky dark:text-sky-dark bg-sky-weak dark:bg-sky-weak-dark' },
@@ -30,6 +31,25 @@ const SEGMENT_FILTERS: { key: CustomerSegment | ''; label: string }[] = [
   { key: 'new', label: '🆕 New' },
   { key: 'paid_up', label: '✅ Paid up' },
 ];
+
+const CustomerRowItem = memo(function CustomerRowItem({ item, currency, onPress }: { item: DebtorRow; currency: string; onPress: (id: string) => void }) {
+  return (
+    <Pressable
+      onPress={() => onPress(item.id)}
+      className="flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
+    >
+      <View className="flex-1">
+        <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark">{item.customerName}</Text>
+        <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
+          <View className={`self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
+            <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
+          </View>
+        </View>
+      </View>
+      <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.amountOwed, currency)}</Text>
+    </Pressable>
+  );
+});
 
 // Mirrors Inventra/components/debtors/DebtorsClient.tsx — Sidebar.tsx labels
 // this nav item "Customers" though the table/module is "Debtors" (credit
@@ -50,6 +70,7 @@ export default function CustomersScreen() {
     totalsQuery.data?.highValueThreshold ?? null,
   );
   const debtors = useMemo(() => listQuery.data?.pages.flatMap((p) => p.rows) ?? [], [listQuery.data]);
+  const handleOpenCustomer = useCallback((id: string) => router.push(`/customers/${id}`), []);
 
   return (
     <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
@@ -89,7 +110,7 @@ export default function CustomersScreen() {
               value={search}
               onChangeText={setSearch}
               placeholder="Search customers…"
-              placeholderTextColor="#aab2c4"
+              placeholderTextColor={PlaceholderTextColor}
               className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
             />
             <Button onPress={() => router.push('/customers/new')} className="self-start px-4">
@@ -127,22 +148,7 @@ export default function CustomersScreen() {
                 if (listQuery.hasNextPage) void listQuery.fetchNextPage();
               }}
               onEndReachedThreshold={0.4}
-              renderItem={({ item }) => (
-                <Pressable
-                  onPress={() => router.push(`/customers/${item.id}`)}
-                  className="flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
-                >
-                  <View className="flex-1">
-                    <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark">{item.customerName}</Text>
-                    <View className="mt-1.5 flex-row flex-wrap items-center gap-1.5">
-                      <View className={`self-start rounded-full px-2 py-0.5 ${STATUS_STYLE[item.status].className}`}>
-                        <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[item.status].className}`}>{STATUS_STYLE[item.status].label}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">{formatMoney(item.amountOwed, currency)}</Text>
-                </Pressable>
-              )}
+              renderItem={({ item }) => <CustomerRowItem item={item} currency={currency} onPress={handleOpenCustomer} />}
             />
           )}
         </>

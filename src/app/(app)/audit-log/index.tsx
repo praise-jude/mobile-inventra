@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/error-state';
 import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
 import { SelectField } from '@/components/ui/select-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
 import { useAuditLogs, useAuditModules, type AuditLogRow } from '@/lib/hooks/use-audit-log';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
@@ -79,7 +80,7 @@ export default function AuditLogScreen() {
           value={search}
           onChangeText={setSearch}
           placeholder="Search by actor, action, or entity…"
-          placeholderTextColor="#aab2c4"
+          placeholderTextColor={PlaceholderTextColor}
           className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
         />
         <SelectField value={module} placeholder="All modules" options={moduleOptions} onChange={setModule} searchable />
@@ -88,14 +89,14 @@ export default function AuditLogScreen() {
             value={dateFrom}
             onChangeText={setDateFrom}
             placeholder="From (YYYY-MM-DD)"
-            placeholderTextColor="#aab2c4"
+            placeholderTextColor={PlaceholderTextColor}
             className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
           />
           <TextInput
             value={dateTo}
             onChangeText={setDateTo}
             placeholder="To (YYYY-MM-DD)"
-            placeholderTextColor="#aab2c4"
+            placeholderTextColor={PlaceholderTextColor}
             className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
           />
         </View>

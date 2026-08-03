@@ -17,6 +17,7 @@ import { formatMoney, formatNumber, formatPct, formatTodayHeader, greetingFor, p
 import { haptics } from '@/lib/haptics';
 import { useBusinessInsights } from '@/lib/hooks/use-business-insights';
 import { useTodaysCashRegister } from '@/lib/hooks/use-cash-register';
+import { CATEGORY_LABEL, dateKeyInTz } from '@/lib/hooks/use-expenses';
 import { useOutOfStockPreview } from '@/lib/hooks/use-products';
 import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
@@ -42,23 +43,6 @@ const STOCK_HEALTH_META: Record<string, { label: string; barClass: string }> = {
 };
 
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-const EXPENSE_CATEGORY_LABEL: Record<ExpenseCategory, string> = {
-  rent: 'Rent',
-  salary: 'Salary',
-  transport: 'Transport',
-  utilities: 'Utilities',
-  inventory_purchase: 'Inventory Purchase',
-  logistics: 'Logistics',
-  miscellaneous: 'Miscellaneous',
-};
-
-// expenses.incurred_at is a plain `date` (no time component) — mirrors
-// Inventra/lib/queries/expenses.ts's dateKeyInTz, timezone only matters for
-// determining what "today" (and 30 days back) actually is in the org's zone.
-function dateKeyInTz(date: Date, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-}
 
 interface ActivityRow {
   id: string;
@@ -183,7 +167,7 @@ export default function DashboardScreen() {
       const expenseBreakdown: ExpenseBreakdownRow[] = Array.from(expenseTotals.entries())
         .map(([category, amount]) => ({
           category,
-          label: EXPENSE_CATEGORY_LABEL[category],
+          label: CATEGORY_LABEL[category],
           amount,
           pct: expenseGrandTotal > 0 ? Math.round((amount / expenseGrandTotal) * 100) : 0,
         }))

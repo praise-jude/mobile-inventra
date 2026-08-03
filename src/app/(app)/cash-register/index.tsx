@@ -15,7 +15,7 @@ import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useTodaysCashRegister } from '@/lib/hooks/use-cash-register';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useWarehouseOptions } from '@/lib/hooks/use-warehouse-options';
 import { isAdminRole, isManagerRole } from '@/lib/roles';
 import { useQueryClient } from '@tanstack/react-query';

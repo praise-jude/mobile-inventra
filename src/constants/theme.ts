@@ -89,15 +89,9 @@ export const Fonts = Platform.select({
   },
 });
 
-export const Spacing = {
-  half: 2,
-  one: 4,
-  two: 8,
-  three: 16,
-  four: 24,
-  five: 32,
-  six: 64,
-} as const;
-
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-export const MaxContentWidth = 800;
+
+// Matches tailwind.config.js's "faint" (light) token — TextInput's
+// placeholderTextColor prop takes a literal color, not a className, so it
+// can't resolve NativeWind's text-faint dark: variant the way JSX can.
+export const PlaceholderTextColor = '#aab2c4';

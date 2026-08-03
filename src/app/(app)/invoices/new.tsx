@@ -6,12 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { TextField } from '@/components/ui/text-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { createInvoice, type InvoiceItemInput } from '@/lib/actions/invoices';
 import { searchProductsForPicker } from '@/lib/actions/inventory';
 import { formatMoney } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 
 interface ItemDraft extends InvoiceItemInput {
   key: number;
@@ -131,7 +132,7 @@ export default function NewInvoiceScreen() {
             value={productSearch}
             onChangeText={setProductSearch}
             placeholder="Search a product to add (optional)…"
-            placeholderTextColor="#aab2c4"
+            placeholderTextColor={PlaceholderTextColor}
             className="mb-2 h-9 rounded-[8px] border border-border bg-surface px-3 text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
           />
           {(productQuery.data ?? []).length > 0 && (
@@ -156,7 +157,7 @@ export default function NewInvoiceScreen() {
                   value={row.description}
                   onChangeText={(v) => updateRow(row.key, { description: v })}
                   placeholder="Description"
-                  placeholderTextColor="#aab2c4"
+                  placeholderTextColor={PlaceholderTextColor}
                   className="mb-2 h-9 rounded-[7px] border border-border bg-bg px-2.5 text-[13px] text-text dark:border-border-dark dark:bg-bg-dark dark:text-text-dark"
                 />
                 <View className="flex-row items-center gap-2">
@@ -165,7 +166,7 @@ export default function NewInvoiceScreen() {
                     onChangeText={(v) => updateRow(row.key, { quantity: Number(v) || 0 })}
                     keyboardType="numeric"
                     placeholder="Qty"
-                    placeholderTextColor="#aab2c4"
+                    placeholderTextColor={PlaceholderTextColor}
                     className="h-9 w-16 rounded-[7px] border border-border bg-bg px-2 text-right text-[13px] text-text dark:border-border-dark dark:bg-bg-dark dark:text-text-dark"
                   />
                   <TextInput
@@ -173,7 +174,7 @@ export default function NewInvoiceScreen() {
                     onChangeText={(v) => updateRow(row.key, { unitPrice: Number(v) || 0 })}
                     keyboardType="numeric"
                     placeholder="Unit price"
-                    placeholderTextColor="#aab2c4"
+                    placeholderTextColor={PlaceholderTextColor}
                     className="h-9 flex-1 rounded-[7px] border border-border bg-bg px-2 text-right text-[13px] text-text dark:border-border-dark dark:bg-bg-dark dark:text-text-dark"
                   />
                   <Text className="w-20 text-right font-mono text-[12.5px] font-semibold text-text dark:text-text-dark">

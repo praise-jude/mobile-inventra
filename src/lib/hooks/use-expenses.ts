@@ -32,7 +32,7 @@ export const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
 // day/week/month is timezone-agnostic except for determining what "today"
 // actually is in the org's zone, mirroring Inventra/lib/queries/expenses.ts's
 // dateKeyInTz exactly.
-function dateKeyInTz(date: Date, timezone: string): string {
+export function dateKeyInTz(date: Date, timezone: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 

@@ -8,6 +8,7 @@ import { PendingApprovalWait } from '@/components/sales/pending-approval-wait';
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
 import { TextField } from '@/components/ui/text-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { recordSale } from '@/lib/actions/sales';
 import { findProductByCode, searchProductsForPicker, type ProductPickerRow } from '@/lib/actions/inventory';
 import { formatMoney } from '@/lib/format';
@@ -171,7 +172,7 @@ export default function NewSaleScreen() {
             value={search}
             onChangeText={setSearch}
             placeholder="Search product name or SKU…"
-            placeholderTextColor="#aab2c4"
+            placeholderTextColor={PlaceholderTextColor}
             className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
           />
           <Pressable

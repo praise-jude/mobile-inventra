@@ -1,6 +1,8 @@
 import { forwardRef, useState } from 'react';
 import { Text, TextInput, View, type TextInputProps } from 'react-native';
 
+import { PlaceholderTextColor } from '@/constants/theme';
+
 // Mirrors Inventra/components/ui/Field.tsx's sizing, radius and color
 // tokens (h-42px, rounded-9px, border/accent/red states) so mobile inputs
 // read as the same design system.
@@ -25,7 +27,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
       {label && <Text className="mb-1.5 text-[12.5px] font-semibold text-text-2 dark:text-text-2-dark">{label}</Text>}
       <TextInput
         ref={ref}
-        placeholderTextColor="#aab2c4"
+        placeholderTextColor={PlaceholderTextColor}
         onFocus={(e) => {
           setFocused(true);
           onFocus?.(e);

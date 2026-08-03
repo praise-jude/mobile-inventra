@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useAuth } from '@/lib/auth-context';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
+import { CATEGORY_LABEL } from '@/lib/hooks/use-expenses';
 import { supabase } from '@/lib/supabase';
 import type { DashboardKpis, ExpenseCategory, MonthlyRevenueProfitRow } from '@/types/database';
 
@@ -96,16 +97,6 @@ export interface BusinessInsights {
   health: BusinessHealth;
   forecast: MonthlyForecast | null;
 }
-
-const CATEGORY_LABEL: Record<ExpenseCategory, string> = {
-  rent: 'Rent',
-  salary: 'Salary',
-  transport: 'Transport',
-  utilities: 'Utilities',
-  inventory_purchase: 'Inventory Purchase',
-  logistics: 'Logistics',
-  miscellaneous: 'Miscellaneous',
-};
 
 function startOfDayInTz(timezone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {

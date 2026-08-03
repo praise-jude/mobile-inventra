@@ -5,7 +5,6 @@
 // billing does.
 import { logAudit } from '@/lib/actions/audit';
 import { requirePermission } from '@/lib/permissions';
-import { isManagerRole } from '@/lib/roles';
 import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { AdjustmentType, Category, Supplier } from '@/types/database';
@@ -149,56 +148,5 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<vo
   });
 }
 
-// Reassigns a product's whole stock to another warehouse — not a
-// partial-quantity split, matching web's own transferWarehouseStock.
-export async function transferWarehouseStock(productId: string, toWarehouseId: string, reason?: string): Promise<void> {
-  const profile = await requireProfile();
-  if (!isManagerRole(profile.role)) {
-    throw new Error('Only an owner, admin, or manager can transfer stock.');
-  }
-
-  const { data: product, error: productError } = await supabase
-    .from('products')
-    .select('id, name, warehouse_id, qty_on_hand')
-    .eq('id', productId)
-    .eq('org_id', profile.org_id)
-    .maybeSingle();
-  if (productError) throw productError;
-  if (!product) throw new Error('Product not found.');
-  if (product.warehouse_id === toWarehouseId) throw new Error('Product is already in that warehouse.');
-
-  const { error: updateError } = await supabase
-    .from('products')
-    .update({ warehouse_id: toWarehouseId })
-    .eq('id', productId)
-    .eq('org_id', profile.org_id);
-  if (updateError) throw new Error('Could not transfer the product.');
-
-  const { error: movementError } = await supabase.from('stock_movements').insert({
-    org_id: profile.org_id,
-    product_id: productId,
-    warehouse_id: toWarehouseId,
-    type: 'transfer',
-    qty_delta: 0,
-    unit_price: null,
-    reason: reason?.trim() || `Transferred ${product.qty_on_hand} units to another warehouse`,
-    adjustment_type: null,
-    notes: null,
-    sale_id: null,
-    created_by: profile.id,
-  });
-  if (movementError) throw new Error('Product was moved, but the movement log entry could not be recorded.');
-
-  void logAudit({
-    orgId: profile.org_id,
-    actorId: profile.id,
-    actorName: `${profile.first_name} ${profile.last_name}`,
-    actorRole: profile.role,
-    action: 'stock.transferred',
-    module: 'Inventory',
-    entityType: 'product',
-    entityId: productId,
-    entityLabel: product.name,
-    newValue: { toWarehouseId },
-  });
-}
+// transferWarehouseStock lives in lib/actions/warehouses.ts (gated by
+// canTransferProduct()) — import it from there, not from this file.

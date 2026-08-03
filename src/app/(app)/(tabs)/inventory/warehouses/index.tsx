@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/format';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useWarehousesOverview } from '@/lib/hooks/use-warehouses';
 import { isAdminRole } from '@/lib/roles';
 import { useUpgradeModal } from '@/lib/upgrade-modal-context';

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { Button } from '@/components/ui/button';
 import { SelectField } from '@/components/ui/select-field';
+import { PlaceholderTextColor } from '@/constants/theme';
 import { REJECT_REASONS, approveMember, reactivateMember, rejectMember, removeMember, resendInvite, suspendMember, updateMemberRole } from '@/lib/actions/team';
 import { useAuth } from '@/lib/auth-context';
 import { confirmAlert, notifyAlert } from '@/lib/confirm';
@@ -78,6 +79,64 @@ function displayStatus(m: TeamMemberRow): 'invited' | 'awaiting_approval' | 'act
   return m.status as 'invited' | 'awaiting_approval' | 'active';
 }
 
+const TeamMemberRowItem = memo(function TeamMemberRowItem({
+  item,
+  currentUserId,
+  isAdmin,
+  isBusy,
+  onPress,
+}: {
+  item: TeamMemberRow;
+  currentUserId: string | undefined;
+  isAdmin: boolean;
+  isBusy: boolean;
+  onPress: (member: TeamMemberRow) => void;
+}) {
+  const status = displayStatus(item);
+  const isSelf = item.id === currentUserId;
+  // Managers can only ever open the sheet for a row they can act on
+  // (approve/reject) — same restriction enforced server-side by
+  // guard_profile_status_transitions().
+  const actionable = !isSelf && item.role !== 'owner' && (isAdmin || status === 'awaiting_approval');
+  return (
+    <Pressable
+      onPress={() => actionable && onPress(item)}
+      disabled={!actionable || isBusy}
+      className="rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
+    >
+      <View className="flex-row items-center gap-3">
+        <View className="h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
+          <Text className="text-[12.5px] font-bold text-accent-text dark:text-accent-text-dark">{item.initials}</Text>
+        </View>
+        <View className="flex-1">
+          <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
+            {item.name} {isSelf && <Text className="text-muted dark:text-muted-dark">(you)</Text>}
+          </Text>
+          <Text className="text-[11.5px] text-muted dark:text-muted-dark" numberOfLines={1}>
+            {item.email}
+          </Text>
+        </View>
+        {isBusy ? (
+          <ActivityIndicator />
+        ) : (
+          <View className={`rounded-full px-2.5 py-1 ${STATUS_STYLE[status].className}`}>
+            <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[status].className}`}>{STATUS_STYLE[status].label}</Text>
+          </View>
+        )}
+      </View>
+      <View className="mt-2.5 flex-row items-center gap-2">
+        <View className={`rounded-full px-2 py-0.5 ${ROLE_STYLE[item.role] ?? ''}`}>
+          <Text className={`text-[10.5px] font-bold capitalize ${ROLE_STYLE[item.role] ?? ''}`}>{item.role}</Text>
+        </View>
+        <Text className="text-[11.5px] text-text-2 dark:text-text-2-dark">{item.branchName ?? 'No branch'}</Text>
+      </View>
+      {status === 'awaiting_approval' && item.acceptedAt && (
+        <Text className="mt-1 text-[10.5px] text-muted dark:text-muted-dark">Waiting {timeAgo(item.acceptedAt)}</Text>
+      )}
+    </Pressable>
+  );
+});
+
 export default function TeamScreen() {
   const { session } = useAuth();
   const currentUserId = session?.user.id;
@@ -101,6 +160,7 @@ export default function TeamScreen() {
   });
   const query = { isLoading: summaryQuery.isLoading || listQuery.isLoading, isError: summaryQuery.isError || listQuery.isError };
   const filtered = useMemo(() => listQuery.data?.pages.flatMap((p) => p.rows) ?? [], [listQuery.data]);
+  const handleOpenTarget = useCallback((m: TeamMemberRow) => setTarget(m), []);
 
   const refetchAll = () => {
     void summaryQuery.refetch();
@@ -170,7 +230,7 @@ export default function TeamScreen() {
               value={search}
               onChangeText={setSearch}
               placeholder="Search by name or email…"
-              placeholderTextColor="#aab2c4"
+              placeholderTextColor={PlaceholderTextColor}
               className="h-[42px] w-full rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
             />
             <FlatList
@@ -210,52 +270,9 @@ export default function TeamScreen() {
             }}
             onEndReachedThreshold={0.4}
             ListEmptyComponent={<EmptyState icon="👥" title="No members found" description="Try a different search or filter." />}
-            renderItem={({ item: m }) => {
-              const status = displayStatus(m);
-              const isSelf = m.id === currentUserId;
-              const isBusy = busyId === m.id;
-              // Managers can only ever open the sheet for a row they can
-              // act on (approve/reject) — same restriction enforced
-              // server-side by guard_profile_status_transitions().
-              const actionable = !isSelf && m.role !== 'owner' && (isAdmin || status === 'awaiting_approval');
-              return (
-                <Pressable
-                  onPress={() => actionable && setTarget(m)}
-                  disabled={!actionable || isBusy}
-                  className="rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
-                >
-                  <View className="flex-row items-center gap-3">
-                    <View className="h-[38px] w-[38px] items-center justify-center rounded-[10px] bg-accent-weak dark:bg-accent-weak-dark">
-                      <Text className="text-[12.5px] font-bold text-accent-text dark:text-accent-text-dark">{m.initials}</Text>
-                    </View>
-                    <View className="flex-1">
-                      <Text className="text-[13.5px] font-semibold text-text dark:text-text-dark" numberOfLines={1}>
-                        {m.name} {isSelf && <Text className="text-muted dark:text-muted-dark">(you)</Text>}
-                      </Text>
-                      <Text className="text-[11.5px] text-muted dark:text-muted-dark" numberOfLines={1}>
-                        {m.email}
-                      </Text>
-                    </View>
-                    {isBusy ? (
-                      <ActivityIndicator />
-                    ) : (
-                      <View className={`rounded-full px-2.5 py-1 ${STATUS_STYLE[status].className}`}>
-                        <Text className={`text-[10.5px] font-bold ${STATUS_STYLE[status].className}`}>{STATUS_STYLE[status].label}</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View className="mt-2.5 flex-row items-center gap-2">
-                    <View className={`rounded-full px-2 py-0.5 ${ROLE_STYLE[m.role] ?? ''}`}>
-                      <Text className={`text-[10.5px] font-bold capitalize ${ROLE_STYLE[m.role] ?? ''}`}>{m.role}</Text>
-                    </View>
-                    <Text className="text-[11.5px] text-text-2 dark:text-text-2-dark">{m.branchName ?? 'No branch'}</Text>
-                  </View>
-                  {status === 'awaiting_approval' && m.acceptedAt && (
-                    <Text className="mt-1 text-[10.5px] text-muted dark:text-muted-dark">Waiting {timeAgo(m.acceptedAt)}</Text>
-                  )}
-                </Pressable>
-              );
-            }}
+            renderItem={({ item }) => (
+              <TeamMemberRowItem item={item} currentUserId={currentUserId} isAdmin={isAdmin} isBusy={busyId === item.id} onPress={handleOpenTarget} />
+            )}
           />
         </>
       )}
@@ -338,7 +355,7 @@ function MemberActionsSheet({
               value={detail}
               onChangeText={setDetail}
               placeholder='Details (only used for "Other")'
-              placeholderTextColor="#aab2c4"
+              placeholderTextColor={PlaceholderTextColor}
               className="h-[42px] w-full rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
             />
           </View>

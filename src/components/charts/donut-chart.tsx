@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 
 import { ChartColors, DONUT_PALETTE } from '@/constants/theme';
@@ -6,7 +7,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 // RN-SVG port of Inventra/components/charts/DonutChart.tsx — same ring-
 // segment math (stroke-dasharray/dashoffset trick on a plain <circle>),
 // rebuilt with react-native-svg's Circle instead of a raw SVG string.
-export function DonutChart({ data, totalLabel }: { data: { name: string; pct: number }[]; totalLabel: string }) {
+export const DonutChart = memo(function DonutChart({ data, totalLabel }: { data: { name: string; pct: number }[]; totalLabel: string }) {
   const scheme = useColorScheme();
   const colors = ChartColors[scheme === 'dark' ? 'dark' : 'light'];
 
@@ -52,4 +53,4 @@ export function DonutChart({ data, totalLabel }: { data: { name: string; pct: nu
       </SvgText>
     </Svg>
   );
-}
+});

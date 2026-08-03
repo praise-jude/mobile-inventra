@@ -15,7 +15,7 @@ import { haptics } from '@/lib/haptics';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useInvoiceDetail } from '@/lib/hooks/use-invoices';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { useOrgCurrency } from '@/lib/hooks/use-org-currency';
+import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { isManagerRole } from '@/lib/roles';
 import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 import type { CustomerInvoiceStatus } from '@/types/database';
