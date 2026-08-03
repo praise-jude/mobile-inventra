@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorState } from '@/components/error-state';
 import { PremiumLockedState } from '@/components/premium-locked-state';
 import { Skeleton } from '@/components/skeleton';
+import { SalesSummaryPanel } from '@/components/sales-summary-panel';
 import { SelectField } from '@/components/ui/select-field';
 import { PlaceholderTextColor } from '@/constants/theme';
 import { FLATLIST_PERF_PROPS } from '@/lib/flatlist-perf';
@@ -14,6 +15,7 @@ import { useAuditLogs, useAuditModules, type AuditLogRow } from '@/lib/hooks/use
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
+import { useOrgTimezone } from '@/lib/hooks/use-org';
 import { isAdminRole } from '@/lib/roles';
 
 function describe(row: AuditLogRow): string {
@@ -27,7 +29,13 @@ function describe(row: AuditLogRow): string {
 export default function AuditLogScreen() {
   const profileQuery = useMyProfile();
   const entitlementsQuery = useEntitlements();
+  const orgTimezone = useOrgTimezone();
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
+  const monthLabel = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    ...(orgTimezone ? { timeZone: orgTimezone } : {}),
+  }).format(new Date());
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [module, setModule] = useState('');
@@ -75,55 +83,58 @@ export default function AuditLogScreen() {
         <View className="w-12" />
       </View>
 
-      <View className="gap-2.5 p-4">
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by actor, action, or entity…"
-          placeholderTextColor={PlaceholderTextColor}
-          className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
-        />
-        <SelectField value={module} placeholder="All modules" options={moduleOptions} onChange={setModule} searchable />
-        <View className="flex-row gap-2.5">
-          <TextInput
-            value={dateFrom}
-            onChangeText={setDateFrom}
-            placeholder="From (YYYY-MM-DD)"
-            placeholderTextColor={PlaceholderTextColor}
-            className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
-          />
-          <TextInput
-            value={dateTo}
-            onChangeText={setDateTo}
-            placeholder="To (YYYY-MM-DD)"
-            placeholderTextColor={PlaceholderTextColor}
-            className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
-          />
-        </View>
-      </View>
-
       {query.isLoading ? (
-        <View className="gap-2.5 px-4">
+        <View className="gap-2.5 p-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-[60px] w-full" />
           ))}
         </View>
       ) : query.isError ? (
         <ErrorState onRetry={() => query.refetch()} />
-      ) : rows.length === 0 ? (
-        <EmptyState icon="🛡️" title="No activity found" description="Try a different search term or module." />
       ) : (
         <FlatList
           data={rows}
           keyExtractor={(r) => r.id}
           {...FLATLIST_PERF_PROPS}
-          contentContainerClassName="gap-2 px-4 pb-6"
           refreshControl={<RefreshControl refreshing={query.isRefetching} onRefresh={() => query.refetch()} />}
           onEndReached={() => {
             if (query.hasNextPage) void query.fetchNextPage();
           }}
           onEndReachedThreshold={0.4}
           ListFooterComponent={query.isFetchingNextPage ? <ActivityIndicator className="py-4" /> : null}
+          ListEmptyComponent={<EmptyState icon="🛡️" title="No activity found" description="Try a different search term or module." />}
+          ListHeaderComponent={
+            <>
+              <SalesSummaryPanel monthLabel={monthLabel} />
+              <View className="gap-2.5 pb-3">
+                <TextInput
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Search by actor, action, or entity…"
+                  placeholderTextColor={PlaceholderTextColor}
+                  className="h-[42px] rounded-[9px] border border-border bg-surface px-[13px] text-[14px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
+                />
+                <SelectField value={module} placeholder="All modules" options={moduleOptions} onChange={setModule} searchable />
+                <View className="flex-row gap-2.5">
+                  <TextInput
+                    value={dateFrom}
+                    onChangeText={setDateFrom}
+                    placeholder="From (YYYY-MM-DD)"
+                    placeholderTextColor={PlaceholderTextColor}
+                    className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
+                  />
+                  <TextInput
+                    value={dateTo}
+                    onChangeText={setDateTo}
+                    placeholder="To (YYYY-MM-DD)"
+                    placeholderTextColor={PlaceholderTextColor}
+                    className="h-[42px] flex-1 rounded-[9px] border border-border bg-surface px-[13px] text-[13px] text-text dark:border-border-dark dark:bg-surface-dark dark:text-text-dark"
+                  />
+                </View>
+              </View>
+            </>
+          }
+          contentContainerClassName="gap-2 px-4 pb-6"
           renderItem={({ item }) => (
             <View className="rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark">
               <View className="flex-row items-center justify-between">

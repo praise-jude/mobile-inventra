@@ -7,6 +7,7 @@ interface OrgContext {
   orgId: string;
   currency: string;
   taxRate: number;
+  timezone: string;
 }
 
 // Small, cached lookup backing useOrgId/useOrgCurrency/useOrgTaxRate, so
@@ -21,8 +22,8 @@ function useOrgContext() {
     queryFn: async (): Promise<OrgContext> => {
       const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', session!.user.id).single();
       if (!profile) throw new Error('No profile');
-      const { data: org } = await supabase.from('organizations').select('currency, tax_rate').eq('id', profile.org_id).single();
-      return { orgId: profile.org_id, currency: org?.currency ?? 'USD', taxRate: Number(org?.tax_rate ?? 0) };
+      const { data: org } = await supabase.from('organizations').select('currency, tax_rate, timezone').eq('id', profile.org_id).single();
+      return { orgId: profile.org_id, currency: org?.currency ?? 'USD', taxRate: Number(org?.tax_rate ?? 0), timezone: org?.timezone ?? 'UTC' };
     },
     enabled: !!session,
     staleTime: 1000 * 60 * 60,
@@ -39,4 +40,8 @@ export function useOrgId(): string | null {
 
 export function useOrgTaxRate(): number {
   return useOrgContext().data?.taxRate ?? 0;
+}
+
+export function useOrgTimezone(): string | undefined {
+  return useOrgContext().data?.timezone;
 }

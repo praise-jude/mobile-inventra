@@ -509,6 +509,13 @@ export type SalesPeriodRpcRow = {
   profit: number;
 };
 
+export type DailySalesSummaryRpcRow = {
+  day: string;
+  total_sales: number;
+  sales_count: number;
+  items_sold: number;
+};
+
 export type SalesByBranchRpcRow = {
   warehouse_id: string;
   warehouse_name: string;
@@ -986,6 +993,10 @@ export type Database = {
       get_sales_by_staff: {
         Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };
         Returns: SalesByStaffRpcRow[];
+      };
+      get_daily_sales_summary: {
+        Args: { p_from: string; p_to: string };
+        Returns: DailySalesSummaryRpcRow[];
       };
       get_inventory_valuation: {
         Args: { p_warehouse_id?: string | null };
