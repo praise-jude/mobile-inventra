@@ -25,7 +25,7 @@ import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
 import { useActiveTeamMembers } from '@/lib/hooks/use-team';
 import { MOVEMENT_META } from '@/lib/movement-meta';
-import { isManagerRole } from '@/lib/roles';
+import { isAdminRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
 import type { CategoryMixRow, DailyProductProfitRow, ExpenseCategory, MonthlyRevenueProfitRow, MonthlySalesVolumeRow, StockHealthRow } from '@/types/database';
 
@@ -100,7 +100,11 @@ export default function DashboardScreen() {
         .single();
       if (orgError) throw orgError;
 
-      const isManagerTier = isManagerRole(profile.role);
+      // Owner/Admin only — Manager/Cashier/Warehouse ("branch" roles) get
+      // the simplified operational dashboard, same narrowing as
+      // Inventra/app/(app)/dashboard/page.tsx. Was isManagerRole (Manager
+      // included), narrowed to owner/admin only.
+      const isOwnerAdmin = isAdminRole(profile.role);
 
       const [kpisRes, topSellersRes, stockHealthRes, activityRes] = await Promise.all([
         supabase.rpc('get_kpis'),
@@ -120,7 +124,7 @@ export default function DashboardScreen() {
       return {
         profile,
         org,
-        isManagerTier,
+        isOwnerAdmin,
         kpis: kpisRes.data,
         topSellers: topSellersRes.data ?? [],
         stockHealth: (stockHealthRes.data ?? []) as StockHealthRow[],
@@ -131,9 +135,9 @@ export default function DashboardScreen() {
   });
 
   // Free plan keeps the basic KPI cards (Today's Revenue etc. — role-gated
-  // only via isManagerTier) but loses the actual charts/trends/breakdowns,
+  // only via isOwnerAdmin) but loses the actual charts/trends/breakdowns,
   // same split as Inventra/app/(app)/dashboard/page.tsx.
-  const showAnalytics = !!coreQuery.data?.isManagerTier && isPremium;
+  const showAnalytics = !!coreQuery.data?.isOwnerAdmin && isPremium;
 
   const analyticsQuery = useQuery({
     queryKey: ['dashboard-analytics', session?.user.id, coreQuery.data?.org.timezone],
@@ -260,7 +264,7 @@ export default function DashboardScreen() {
     );
   }
 
-  const { profile, org, isManagerTier, kpis, topSellers, stockHealth, activity } = coreQuery.data;
+  const { profile, org, isOwnerAdmin, kpis, topSellers, stockHealth, activity } = coreQuery.data;
   const greeting = greetingFor(org.timezone);
   const today = formatTodayHeader(org.timezone);
   const totalStock = stockHealth.reduce((sum, s) => (s.label === 'expiring' ? sum : sum + Number(s.count)), 0);
@@ -280,7 +284,7 @@ export default function DashboardScreen() {
       sub: 'vs yesterday',
       delta: formatPct(pctDelta(kpis.today_revenue, kpis.yesterday_revenue)),
       deltaUp: kpis.today_revenue >= kpis.yesterday_revenue,
-      show: isManagerTier,
+      show: true,
     },
     {
       key: 'profit',
@@ -289,7 +293,7 @@ export default function DashboardScreen() {
       sub: 'vs last month',
       delta: formatPct(pctDelta(kpis.monthly_profit ?? 0, kpis.prior_monthly_profit)),
       deltaUp: (kpis.monthly_profit ?? 0) >= (kpis.prior_monthly_profit ?? 0),
-      show: isManagerTier,
+      show: isOwnerAdmin,
     },
     {
       key: 'low_stock',
@@ -310,7 +314,7 @@ export default function DashboardScreen() {
       label: 'Inventory value',
       value: formatMoney(kpis.total_inventory_value ?? 0, org.currency),
       sub: 'selling price × stock',
-      show: isManagerTier,
+      show: isOwnerAdmin,
     },
   ].filter((c) => c.show);
 
@@ -419,7 +423,7 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-        {isManagerTier && defaultWarehouseId && (
+        {isOwnerAdmin && defaultWarehouseId && (
           <Pressable
             onPress={() => router.push('/cash-register')}
             className="mt-4 flex-row items-center justify-between rounded-2xl border border-border bg-surface p-3.5 dark:border-border-dark dark:bg-surface-dark"
@@ -613,7 +617,7 @@ export default function DashboardScreen() {
                     <Text className="text-[11px] text-muted dark:text-muted-dark">{formatNumber(p.units)} sold</Text>
                   </View>
                   <View className="items-end">
-                    {isManagerTier && (
+                    {isOwnerAdmin && (
                       <Text className="font-mono text-[13px] font-bold text-text dark:text-text-dark">
                         {formatMoney(p.revenue, org.currency)}
                       </Text>

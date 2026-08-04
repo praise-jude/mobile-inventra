@@ -7,34 +7,32 @@ import { signOut } from '@/lib/actions/auth';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
-import { isAdminRole, isManagerRole } from '@/lib/roles';
+import { isAdminRole } from '@/lib/roles';
 
 // Security (MFA) is every role's own account setting, unconditional —
 // mirrors Inventra/app/(app)/account/security/page.tsx's comment: "every
 // role needs to reach this page", deliberately not under the admin-tier
-// gate the rest of /settings uses. Team Management (invites/approvals/role
-// UI) was removed in favor of branch-code signup — Branches (below, in
-// ADMIN_ROWS, same admin tier Inventra/components/app/Sidebar.tsx uses for
-// its replacement) is where an Owner/Admin generates a branch's signup code.
+// gate the rest of /settings uses.
+//
+// Manager/Cashier/Warehouse ("branch" roles) get a deliberately narrow
+// settings screen now — mirrors Sidebar.tsx on web: everything
+// admin-adjacent (branch management, staff, approvals, suppliers, cash
+// reconciliation, customer credit) moved into ADMIN_ROWS (owner/admin
+// only). Expenses used to be manager-tier+ only; widened into
+// ALWAYS_ROWS since branch roles need it too. Branch Staff's row was
+// removed outright — Admin already reaches the same feature via the
+// Staff panel on the web Branches page; mobile's manager loses a
+// dedicated entry point, but the page itself still works if linked
+// directly.
 const ALWAYS_ROWS = [
   { href: '/settings/appearance' as const, icon: '🎨', label: 'Appearance', description: 'Light, dark, or match your device' },
   { href: '/settings/security' as const, icon: '🔐', label: 'Security', description: 'Two-factor authentication, recovery codes' },
   { href: '/support' as const, icon: '💬', label: 'Contact support', description: 'Email or WhatsApp us directly' },
-  // Open to every role (Staff can view today's cash, just not edit/close —
-  // enforced inside the screen itself) — not in MANAGER_ROWS below, which
-  // is hidden from Staff entirely.
-  { href: '/cash-register' as const, icon: '🧮', label: 'Cash Register', description: "Opening float, today's cash position, and close-of-day" },
+  { href: '/expenses' as const, icon: '💸', label: 'Expenses', description: 'Log rent, salary, transport and other spend' },
 ];
 // Invoices matches Sidebar.tsx's `hideForWarehouse` scope on web (every
-// role except Warehouse can create one) — broader than the manager-tier+
-// rows below, so it gets its own bucket rather than joining MANAGER_ROWS.
+// role except Warehouse can create one).
 const SALES_ROWS = [{ href: '/invoices' as const, icon: '📄', label: 'Invoices', description: 'Create and track customer invoices' }];
-const MANAGER_ROWS = [
-  { href: '/branch-staff' as const, icon: '🧑‍🤝‍🧑', label: 'Branch Staff', description: 'Invite and approve Cashier/Warehouse staff for your branch' },
-  { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
-  { href: '/expenses' as const, icon: '💸', label: 'Expenses', description: 'Log rent, salary, transport and other spend' },
-  { href: '/supply-records' as const, icon: '🚛', label: 'Supply Records', description: 'Record deliveries from suppliers and track cost' },
-];
 const ADMIN_ROWS = [
   { href: '/settings/general' as const, icon: '🏢', label: 'General', description: 'Business name, contact, currency, tax rate' },
   { href: '/inventory/warehouses' as const, icon: '👥', label: 'Branches', description: 'Manage branches and generate signup codes' },
@@ -43,6 +41,9 @@ const ADMIN_ROWS = [
   { href: '/settings/printing' as const, icon: '🖨️', label: 'Receipts & Printing', description: 'Paper size, auto-print, receipt footer' },
   { href: '/settings/approvals' as const, icon: '✅', label: 'Approvals', description: 'Require sign-off for large discounts, voids, price changes' },
   { href: '/audit-log' as const, icon: '🛡️', label: 'Audit Log', description: 'Who changed what, and when' },
+  { href: '/cash-register' as const, icon: '🧮', label: 'Cash Register', description: "Opening float, today's cash position, and close-of-day" },
+  { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
+  { href: '/supply-records' as const, icon: '🚛', label: 'Supply Records', description: 'Record deliveries from suppliers and track cost' },
 ];
 
 // Mirrors Inventra/components/settings/SettingsTabs.tsx's section nav —
@@ -52,7 +53,6 @@ export default function SettingsScreen() {
   const { session } = useAuth();
   const profileQuery = useMyProfile();
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
-  const isManagerUp = isManagerRole(profileQuery.data?.role ?? '');
 
   const isWarehouse = profileQuery.data?.role === 'warehouse';
 
@@ -61,19 +61,18 @@ export default function SettingsScreen() {
       | '/settings/appearance'
       | '/settings/security'
       | '/support'
-      | '/cash-register'
-      | '/invoices'
-      | '/branch-staff'
-      | '/customers'
       | '/expenses'
-      | '/supply-records'
+      | '/invoices'
       | '/settings/general'
       | '/inventory/warehouses'
       | '/settings/roles'
       | '/settings/notifications'
       | '/settings/printing'
       | '/settings/approvals'
-      | '/audit-log';
+      | '/audit-log'
+      | '/cash-register'
+      | '/customers'
+      | '/supply-records';
     icon: string;
     label: string;
     description: string;
@@ -114,15 +113,14 @@ export default function SettingsScreen() {
         <View className="mt-6 gap-2.5">
           {ALWAYS_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {!isWarehouse && SALES_ROWS.map((row) => <Row key={row.href} {...row} />)}
-          {isManagerUp && MANAGER_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {isAdmin && ADMIN_ROWS.map((row) => <Row key={row.href} {...row} />)}
         </View>
 
-        {!isManagerUp && (
+        {!isAdmin && (
           <View className="mt-2.5 rounded-2xl border border-border bg-surface p-5 dark:border-border-dark dark:bg-surface-dark">
             <Text className="text-[13px] font-bold text-text dark:text-text-dark">Business settings</Text>
             <Text className="mt-1 text-[12.5px] leading-snug text-text-2 dark:text-text-2-dark">
-              Only a workspace owner, admin, or manager can view business settings.
+              Only a workspace owner or admin can view business settings.
             </Text>
           </View>
         )}
