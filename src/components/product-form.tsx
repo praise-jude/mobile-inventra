@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { BarcodeScannerModal } from '@/components/barcode-scanner';
 import { Button } from '@/components/ui/button';
@@ -96,7 +97,7 @@ export function ProductForm({
       <ScrollView contentContainerClassName="gap-3.5 p-5" keyboardShouldPersistTaps="handled">
         <Pressable onPress={pickPhoto} className="items-center">
           {photoUri ? (
-            <Image source={{ uri: photoUri }} className="h-24 w-24 rounded-2xl" />
+            <Image source={{ uri: photoUri }} className="h-24 w-24 rounded-2xl" contentFit="cover" />
           ) : (
             <View className="h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-border bg-surface dark:border-border-dark dark:bg-surface-dark">
               <Text className="text-[24px]">📷</Text>

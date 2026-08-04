@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
@@ -161,7 +162,9 @@ export default function ProductDetailScreen() {
       <ScrollView contentContainerClassName="p-5 pb-10">
         <View className="items-center">
           {product.image_url ? (
-            <View className="h-20 w-20 overflow-hidden rounded-2xl bg-surface dark:bg-surface-dark" />
+            <View className="h-20 w-20 overflow-hidden rounded-2xl bg-surface dark:bg-surface-dark">
+              <Image source={{ uri: product.image_url }} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={150} />
+            </View>
           ) : (
             <View className="h-20 w-20 items-center justify-center rounded-2xl bg-accent-weak dark:bg-accent-weak-dark">
               <Text className="text-[32px]">{product.emoji || '📦'}</Text>
