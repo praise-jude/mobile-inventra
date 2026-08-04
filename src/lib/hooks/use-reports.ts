@@ -74,6 +74,16 @@ export interface DateRange {
   to: string;
 }
 
+export interface BranchPerformanceRow {
+  warehouseId: string;
+  branchName: string;
+  revenue: number;
+  profit: number;
+  expenses: number;
+  stockValue: number;
+  skuCount: number;
+}
+
 export function useSalesReport(range: DateRange, granularity: Granularity, warehouseId?: string) {
   return useQuery({
     queryKey: ['sales-report', range, granularity, warehouseId],
@@ -131,6 +141,30 @@ export function useSalesReport(range: DateRange, granularity: Granularity, wareh
       }));
 
       return { summary, byPeriod, byBranch, byProduct, byStaff };
+    },
+  });
+}
+
+// Admin/Owner only (enforced by the caller — see branch-performance.tsx) —
+// unlike useSalesReport's byBranch above (revenue only, every Reports
+// viewer sees it), get_branch_performance_report is not security definer,
+// so a branch-scoped Manager/Cashier/Warehouse caller would see zeros for
+// every branch but their own via RLS rather than a real comparison.
+export function useBranchPerformanceReport(range: DateRange) {
+  return useQuery({
+    queryKey: ['branch-performance-report', range],
+    queryFn: async (): Promise<BranchPerformanceRow[]> => {
+      const { data, error } = await supabase.rpc('get_branch_performance_report', { p_from: range.from, p_to: range.to });
+      if (error) throw new Error('Could not load the branch performance report.');
+      return data.map((r) => ({
+        warehouseId: r.warehouse_id,
+        branchName: r.branch_name,
+        revenue: Number(r.revenue),
+        profit: Number(r.profit),
+        expenses: Number(r.expenses),
+        stockValue: Number(r.stock_value),
+        skuCount: Number(r.sku_count),
+      }));
     },
   });
 }

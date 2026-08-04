@@ -10,6 +10,7 @@ export interface ExpenseRow {
   description: string | null;
   amount: number;
   incurredAt: string;
+  warehouseId: string | null;
 }
 
 export interface ExpensesTotals {
@@ -90,7 +91,7 @@ export function useRecentExpenses(limit = 20) {
     queryFn: async (): Promise<ExpenseRow[]> => {
       const { data, error } = await supabase
         .from('expenses')
-        .select('id, category, description, amount, incurred_at')
+        .select('id, category, description, amount, incurred_at, warehouse_id')
         .order('incurred_at', { ascending: false })
         .limit(limit);
       if (error) throw new Error('Could not load expenses.');
@@ -100,6 +101,7 @@ export function useRecentExpenses(limit = 20) {
         description: e.description,
         amount: Number(e.amount),
         incurredAt: e.incurred_at,
+        warehouseId: e.warehouse_id,
       }));
     },
     enabled: !!session,

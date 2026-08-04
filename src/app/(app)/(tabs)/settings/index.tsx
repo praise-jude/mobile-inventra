@@ -30,7 +30,7 @@ const ALWAYS_ROWS = [
 // rows below, so it gets its own bucket rather than joining MANAGER_ROWS.
 const SALES_ROWS = [{ href: '/invoices' as const, icon: '📄', label: 'Invoices', description: 'Create and track customer invoices' }];
 const MANAGER_ROWS = [
-  { href: '/approvals' as const, icon: '📝', label: 'Approval Requests', description: 'Review pending discounts, voids, and price changes' },
+  { href: '/branch-staff' as const, icon: '🧑‍🤝‍🧑', label: 'Branch Staff', description: 'Invite and approve Cashier/Warehouse staff for your branch' },
   { href: '/customers' as const, icon: '💵', label: 'Customers', description: 'Track customer credit balances and payments' },
   { href: '/expenses' as const, icon: '💸', label: 'Expenses', description: 'Log rent, salary, transport and other spend' },
   { href: '/supply-records' as const, icon: '🚛', label: 'Supply Records', description: 'Record deliveries from suppliers and track cost' },
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
       | '/support'
       | '/cash-register'
       | '/invoices'
-      | '/approvals'
+      | '/branch-staff'
       | '/customers'
       | '/expenses'
       | '/supply-records'

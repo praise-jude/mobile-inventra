@@ -9,8 +9,10 @@ import { PRESET_LABELS, rangeForPreset, type DateRangePreset } from '@/lib/date-
 import { formatMoney, formatNumber } from '@/lib/format';
 import { haptics } from '@/lib/haptics';
 import { useLogReportView } from '@/lib/hooks/use-log-report-view';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
 import { useSalesReport } from '@/lib/hooks/use-reports';
+import { isAdminRole } from '@/lib/roles';
 
 // Mirrors Inventra/components/reports/SalesReportClient.tsx — condensed to
 // stat cards + ranked lists instead of charts (no charting library in this
@@ -19,6 +21,8 @@ import { useSalesReport } from '@/lib/hooks/use-reports';
 export default function SalesReportScreen() {
   const [preset, setPreset] = useState<DateRangePreset>('month');
   const currency = useOrgCurrency();
+  const profileQuery = useMyProfile();
+  const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
   const range = rangeForPreset(preset);
   const query = useSalesReport({ from: range.from, to: range.to }, range.granularity === 'month' ? 'month' : 'day');
   useLogReportView('Sales Report', query.isSuccess);
@@ -125,6 +129,15 @@ export default function SalesReportScreen() {
           >
             <Text className="text-[13px] font-semibold text-accent-text dark:text-accent-text-dark">View inventory valuation →</Text>
           </Pressable>
+
+          {isAdmin && (
+            <Pressable
+              onPress={() => router.push('/reports/branch-performance')}
+              className="items-center rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark"
+            >
+              <Text className="text-[13px] font-semibold text-accent-text dark:text-accent-text-dark">View branch performance →</Text>
+            </Pressable>
+          )}
         </ScrollView>
       )}
       </SafeAreaView>

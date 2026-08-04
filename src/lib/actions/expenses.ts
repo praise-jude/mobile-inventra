@@ -5,8 +5,11 @@ import { requireProfile } from '@/lib/session';
 import { supabase } from '@/lib/supabase';
 import type { ExpenseCategory } from '@/types/database';
 
-// Expenses are Manager-tier+ — expenses_rw RLS is fully open (any org
-// member), so this is the real gate, matching web's requireManagerOrgId.
+// Expenses are Manager-tier+ — expenses_write/update/delete RLS enforces
+// the same role check at the DB layer, this just gives a clear error
+// instead of a silent RLS no-op, matching web's requireManagerOrgId.
+// expenses_select is additionally branch-scoped for Cashier/Warehouse/
+// branch-code-onboarded Manager roles (see current_user_branch_scope()).
 async function requireManagerProfile() {
   const profile = await requireProfile();
   if (!['owner', 'admin', 'manager'].includes(profile.role)) {
@@ -20,6 +23,7 @@ export interface ExpenseInput {
   description?: string;
   amount: number;
   incurredAt: string;
+  warehouseId?: string;
 }
 
 export async function createExpense(input: ExpenseInput): Promise<void> {
@@ -37,6 +41,7 @@ export async function createExpense(input: ExpenseInput): Promise<void> {
       description: input.description?.trim() || null,
       amount: input.amount,
       incurred_at: input.incurredAt,
+      warehouse_id: input.warehouseId || null,
     })
     .select('id')
     .single();
@@ -52,7 +57,7 @@ export async function createExpense(input: ExpenseInput): Promise<void> {
     entityType: 'expense',
     entityId: expense.id as string,
     entityLabel: input.category,
-    newValue: { category: input.category, amount: input.amount, incurredAt: input.incurredAt },
+    newValue: { category: input.category, amount: input.amount, incurredAt: input.incurredAt, warehouseId: input.warehouseId ?? null },
   });
 }
 
@@ -67,6 +72,7 @@ export async function updateExpense(id: string, input: ExpenseInput): Promise<vo
       description: input.description?.trim() || null,
       amount: input.amount,
       incurred_at: input.incurredAt,
+      warehouse_id: input.warehouseId || null,
     })
     .eq('id', id);
   if (error) throw new Error('Could not update the expense.');
@@ -81,7 +87,7 @@ export async function updateExpense(id: string, input: ExpenseInput): Promise<vo
     entityType: 'expense',
     entityId: id,
     entityLabel: input.category,
-    newValue: { category: input.category, amount: input.amount, incurredAt: input.incurredAt },
+    newValue: { category: input.category, amount: input.amount, incurredAt: input.incurredAt, warehouseId: input.warehouseId ?? null },
   });
 }
 

@@ -15,6 +15,7 @@ import { haptics } from '@/lib/haptics';
 import { CATEGORY_LABEL, useExpenseCategoryBreakdown, useExpensesTotals, useRecentExpenses, type ExpenseRow } from '@/lib/hooks/use-expenses';
 import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useOrgCurrency } from '@/lib/hooks/use-org';
+import { useWarehousesOverview } from '@/lib/hooks/use-warehouses';
 import { useUpgradeModal } from '@/lib/upgrade-modal-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { SelectField } from '@/components/ui/select-field';
@@ -31,6 +32,8 @@ export default function ExpensesScreen() {
   const totalsQuery = useExpensesTotals();
   const recentQuery = useRecentExpenses();
   const breakdownQuery = useExpenseCategoryBreakdown();
+  const warehousesQuery = useWarehousesOverview();
+  const warehouseNameById = new Map((warehousesQuery.data ?? []).map((w) => [w.id, w.name]));
   const entitlementsQuery = useEntitlements();
   const isPremium = entitlementsQuery.data?.tier === 'premium';
   const { openUpgradeModal } = useUpgradeModal();
@@ -157,7 +160,9 @@ export default function ExpensesScreen() {
                 </View>
                 {e.description && <Text className="mt-0.5 text-[12px] text-text-2 dark:text-text-2-dark">{e.description}</Text>}
                 <View className="mt-2 flex-row items-center justify-between">
-                  <Text className="text-[11px] text-muted dark:text-muted-dark">{e.incurredAt}</Text>
+                  <Text className="text-[11px] text-muted dark:text-muted-dark">
+                    {e.incurredAt} · {e.warehouseId ? (warehouseNameById.get(e.warehouseId) ?? '—') : 'Company-wide'}
+                  </Text>
                   <View className="flex-row gap-2">
                     <Pressable onPress={() => setEditing(e)} className="rounded-[8px] border border-border px-2.5 py-1 dark:border-border-dark">
                       <Text className="text-[11.5px] font-semibold text-text dark:text-text-dark">Edit</Text>
@@ -189,18 +194,22 @@ export default function ExpensesScreen() {
 }
 
 function ExpenseEditSheet({ expense, onClose, onSaved }: { expense: ExpenseRow; onClose: () => void; onSaved: () => void }) {
+  const warehousesQuery = useWarehousesOverview();
   const [category, setCategory] = useState<ExpenseCategory>(expense.category);
   const [description, setDescription] = useState(expense.description ?? '');
   const [amount, setAmount] = useState(String(expense.amount));
   const [incurredAt, setIncurredAt] = useState(expense.incurredAt);
+  const [warehouseId, setWarehouseId] = useState(expense.warehouseId ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const warehouseOptions = (warehousesQuery.data ?? []).map((w) => ({ label: w.name, value: w.id }));
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      await updateExpense(expense.id, { category, description, amount: Number(amount) || 0, incurredAt });
+      await updateExpense(expense.id, { category, description, amount: Number(amount) || 0, incurredAt, warehouseId: warehouseId || undefined });
       haptics.success();
       onSaved();
       onClose();
@@ -221,6 +230,13 @@ function ExpenseEditSheet({ expense, onClose, onSaved }: { expense: ExpenseRow; 
           <TextField label="Description (optional)" value={description} onChangeText={setDescription} />
           <TextField label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" />
           <TextField label="Date (YYYY-MM-DD)" value={incurredAt} onChangeText={setIncurredAt} />
+          <SelectField
+            label="Branch (optional)"
+            placeholder="Company-wide"
+            value={warehouseId}
+            options={warehouseOptions}
+            onChange={setWarehouseId}
+          />
           {error && <Text className="text-[13px] font-medium text-red dark:text-red-dark">{error}</Text>}
           <Button loading={saving} onPress={handleSave} className="mt-1">
             Save changes

@@ -217,6 +217,7 @@ export type Expense = {
   description: string | null;
   amount: number;
   incurred_at: string;
+  warehouse_id: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -524,6 +525,16 @@ export type SalesByBranchRpcRow = {
   warehouse_name: string;
   revenue: number;
   sales_count: number;
+};
+
+export type BranchPerformanceRpcRow = {
+  warehouse_id: string;
+  branch_name: string;
+  revenue: number;
+  profit: number;
+  expenses: number;
+  stock_value: number;
+  sku_count: number;
 };
 
 export type SalesByProductRpcRow = {
@@ -992,6 +1003,10 @@ export type Database = {
       get_sales_by_branch: {
         Args: { p_from: string; p_to: string };
         Returns: SalesByBranchRpcRow[];
+      };
+      get_branch_performance_report: {
+        Args: { p_from: string; p_to: string };
+        Returns: BranchPerformanceRpcRow[];
       };
       get_sales_by_product: {
         Args: { p_from: string; p_to: string; p_warehouse_id?: string | null };

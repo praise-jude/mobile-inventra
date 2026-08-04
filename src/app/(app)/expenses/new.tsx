@@ -10,6 +10,7 @@ import { TextField } from '@/components/ui/text-field';
 import { createExpense } from '@/lib/actions/expenses';
 import { haptics } from '@/lib/haptics';
 import { CATEGORY_LABEL } from '@/lib/hooks/use-expenses';
+import { useWarehousesOverview } from '@/lib/hooks/use-warehouses';
 import type { ExpenseCategory } from '@/types/database';
 
 const CATEGORY_OPTIONS = (Object.keys(CATEGORY_LABEL) as ExpenseCategory[]).map((c) => ({ label: CATEGORY_LABEL[c], value: c }));
@@ -20,20 +21,25 @@ function today(): string {
 
 export default function NewExpenseScreen() {
   const queryClient = useQueryClient();
+  const warehousesQuery = useWarehousesOverview();
   const [category, setCategory] = useState<ExpenseCategory>('miscellaneous');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [incurredAt, setIncurredAt] = useState(today());
+  const [warehouseId, setWarehouseId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const warehouseOptions = (warehousesQuery.data ?? []).map((w) => ({ label: w.name, value: w.id }));
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      await createExpense({ category, description, amount: Number(amount) || 0, incurredAt });
+      await createExpense({ category, description, amount: Number(amount) || 0, incurredAt, warehouseId: warehouseId || undefined });
       haptics.success();
-      queryClient.invalidateQueries({ queryKey: ['expenses-overview'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses-totals'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-expenses'] });
       queryClient.invalidateQueries({ queryKey: ['expense-category-breakdown'] });
       router.back();
     } catch (err) {
@@ -59,6 +65,13 @@ export default function NewExpenseScreen() {
         <TextField label="Description (optional)" value={description} onChangeText={setDescription} />
         <TextField label="Amount" value={amount} onChangeText={setAmount} keyboardType="numeric" autoFocus />
         <TextField label="Date (YYYY-MM-DD)" value={incurredAt} onChangeText={setIncurredAt} />
+        <SelectField
+          label="Branch (optional)"
+          placeholder="Company-wide"
+          value={warehouseId}
+          options={warehouseOptions}
+          onChange={setWarehouseId}
+        />
 
         {error && <Text className="text-[13px] font-medium text-red dark:text-red-dark">{error}</Text>}
 
