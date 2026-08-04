@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Print from 'expo-print';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
@@ -84,6 +84,18 @@ export default function InvoiceDetailScreen() {
   const [deleting, setDeleting] = useState(false);
   const [cloudBusy, setCloudBusy] = useState(false);
 
+  // Surfaces the cloud-archive state up front (a colored dot + label) instead
+  // of only finding out on tapping "View cloud copy" — getInvoicePdfArchiveUrl
+  // already never throws (returns null for "no copy yet" same as "Google
+  // Cloud isn't configured"/network unreachable), so this doubles as an
+  // online/offline indicator for the archive feature itself.
+  const cloudStatusQuery = useQuery({
+    queryKey: ['invoice-cloud-status', id],
+    queryFn: () => getInvoicePdfArchiveUrl(id!),
+    enabled: !!id,
+    staleTime: 1000 * 30,
+  });
+
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['invoice-detail', id] });
     queryClient.invalidateQueries({ queryKey: ['invoices-overview'] });
@@ -118,8 +130,14 @@ export default function InvoiceDetailScreen() {
       }
       // Best-effort cloud archive — the share above already happened;
       // this just also keeps a durable copy. Never surfaces an error for
-      // the share itself if this fails.
-      if (id) archiveInvoicePdf(id, uri).catch(() => {});
+      // the share itself if this fails. Refetch the status badge on
+      // success so it flips to "online" immediately rather than waiting
+      // out its 30s staleTime.
+      if (id) {
+        archiveInvoicePdf(id, uri)
+          .then(() => queryClient.invalidateQueries({ queryKey: ['invoice-cloud-status', id] }))
+          .catch(() => {});
+      }
     } catch {
       notifyAlert('Error', 'Could not generate the invoice PDF.');
     } finally {
@@ -270,6 +288,26 @@ export default function InvoiceDetailScreen() {
           <Button loading={sharing} onPress={handleShare}>
             Share invoice (PDF){!isPremium ? ' (PRO)' : ''}
           </Button>
+
+          <View className="flex-row items-center gap-2 self-center">
+            <View
+              className={`h-2 w-2 rounded-full ${
+                cloudStatusQuery.isLoading
+                  ? 'bg-border-2 dark:bg-border-2-dark'
+                  : cloudStatusQuery.data
+                    ? 'bg-green dark:bg-green-dark'
+                    : 'bg-muted dark:bg-muted-dark'
+              }`}
+            />
+            <Text className="text-[11px] font-semibold text-text-2 dark:text-text-2-dark">
+              {cloudStatusQuery.isLoading
+                ? 'Checking cloud storage…'
+                : cloudStatusQuery.data
+                  ? 'Cloud storage: Online'
+                  : 'Cloud storage: Offline'}
+            </Text>
+          </View>
+
           <Button variant="secondary" loading={cloudBusy} onPress={handleViewCloudCopy}>
             ☁️ View cloud copy
           </Button>
