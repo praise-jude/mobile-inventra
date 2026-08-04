@@ -1,9 +1,11 @@
+import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/actions/auth';
+import { getGoogleCloudStatus } from '@/lib/actions/google-cloud';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
@@ -55,6 +57,16 @@ export default function SettingsScreen() {
   const isAdmin = isAdminRole(profileQuery.data?.role ?? '');
 
   const isWarehouse = profileQuery.data?.role === 'warehouse';
+
+  // Mirrors Inventra/app/(app)/settings/integrations/page.tsx's Cloud
+  // Storage card — live-checked (not a cosmetic toggle), admin-only since
+  // it's an infra concern, not a day-to-day operational one.
+  const cloudStatusQuery = useQuery({
+    queryKey: ['google-cloud-status'],
+    queryFn: getGoogleCloudStatus,
+    enabled: isAdmin,
+    staleTime: 1000 * 60,
+  });
 
   function Row(row: {
     href:
@@ -115,6 +127,49 @@ export default function SettingsScreen() {
           {!isWarehouse && SALES_ROWS.map((row) => <Row key={row.href} {...row} />)}
           {isAdmin && ADMIN_ROWS.map((row) => <Row key={row.href} {...row} />)}
         </View>
+
+        {isAdmin && (
+          <View className="mt-2.5 flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+            <View
+              className={`h-10 w-10 items-center justify-center rounded-[10px] ${
+                cloudStatusQuery.data?.connected ? 'bg-green-weak dark:bg-green-weak-dark' : 'bg-red-weak dark:bg-red-weak-dark'
+              }`}
+            >
+              <Text className="text-[18px]">☁️</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-[14px] font-semibold text-text dark:text-text-dark">Google Cloud Storage</Text>
+              <Text className="text-[11.5px] text-muted dark:text-muted-dark">Invoice PDF archival</Text>
+            </View>
+            <View
+              className={`rounded-[20px] px-2.5 py-0.5 ${
+                cloudStatusQuery.isLoading
+                  ? 'bg-border-2 dark:bg-border-2-dark'
+                  : cloudStatusQuery.data?.connected
+                    ? 'bg-green-weak dark:bg-green-weak-dark'
+                    : 'bg-red-weak dark:bg-red-weak-dark'
+              }`}
+            >
+              <Text
+                className={`text-[11px] font-bold ${
+                  cloudStatusQuery.isLoading
+                    ? 'text-muted dark:text-muted-dark'
+                    : cloudStatusQuery.data?.connected
+                      ? 'text-green dark:text-green-dark'
+                      : 'text-red dark:text-red-dark'
+                }`}
+              >
+                {cloudStatusQuery.isLoading
+                  ? 'Checking…'
+                  : cloudStatusQuery.data?.connected
+                    ? 'Connected'
+                    : cloudStatusQuery.data?.configured
+                      ? 'Unreachable'
+                      : 'Not configured'}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {!isAdmin && (
           <View className="mt-2.5 rounded-2xl border border-border bg-surface p-5 dark:border-border-dark dark:bg-surface-dark">
