@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui/button';
 import { signOut } from '@/lib/actions/auth';
 import { getGoogleCloudStatus } from '@/lib/actions/google-cloud';
+import { getSlackStatus } from '@/lib/actions/slack';
 import { useAuth } from '@/lib/auth-context';
 import { haptics } from '@/lib/haptics';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
@@ -48,6 +49,47 @@ const ADMIN_ROWS = [
   { href: '/supply-records' as const, icon: '🚛', label: 'Supply Records', description: 'Record deliveries from suppliers and track cost' },
 ];
 
+function StatusRow({
+  icon,
+  label,
+  sub,
+  loading,
+  connected,
+  notConfiguredLabel,
+}: {
+  icon: string;
+  label: string;
+  sub: string;
+  loading: boolean;
+  connected: boolean;
+  notConfiguredLabel: string;
+}) {
+  return (
+    <View className="mt-2.5 flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+      <View className={`h-10 w-10 items-center justify-center rounded-[10px] ${connected ? 'bg-green-weak dark:bg-green-weak-dark' : 'bg-red-weak dark:bg-red-weak-dark'}`}>
+        <Text className="text-[18px]">{icon}</Text>
+      </View>
+      <View className="flex-1">
+        <Text className="text-[14px] font-semibold text-text dark:text-text-dark">{label}</Text>
+        <Text className="text-[11.5px] text-muted dark:text-muted-dark">{sub}</Text>
+      </View>
+      <View
+        className={`rounded-[20px] px-2.5 py-0.5 ${
+          loading ? 'bg-border-2 dark:bg-border-2-dark' : connected ? 'bg-green-weak dark:bg-green-weak-dark' : 'bg-red-weak dark:bg-red-weak-dark'
+        }`}
+      >
+        <Text
+          className={`text-[11px] font-bold ${
+            loading ? 'text-muted dark:text-muted-dark' : connected ? 'text-green dark:text-green-dark' : 'text-red dark:text-red-dark'
+          }`}
+        >
+          {loading ? 'Checking…' : connected ? 'Connected' : notConfiguredLabel}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 // Mirrors Inventra/components/settings/SettingsTabs.tsx's section nav —
 // the business-config rows are admin-tier+ (Sidebar.tsx's `adminOnly:
 // true`), so non-admins only see Security (+ Team, if Manager-tier+).
@@ -65,6 +107,16 @@ export default function SettingsScreen() {
     queryKey: ['google-cloud-status'],
     queryFn: getGoogleCloudStatus,
     enabled: isAdmin,
+    staleTime: 1000 * 60,
+  });
+
+  // Read-only here — connecting/disconnecting Slack stays web-only
+  // (Settings -> Integrations, needs a webhook URL form). Mirrors
+  // Inventra's same status card.
+  const slackStatusQuery = useQuery({
+    queryKey: ['slack-status', profileQuery.data?.org_id],
+    queryFn: () => getSlackStatus(profileQuery.data!.org_id),
+    enabled: isAdmin && !!profileQuery.data?.org_id,
     staleTime: 1000 * 60,
   });
 
@@ -129,46 +181,24 @@ export default function SettingsScreen() {
         </View>
 
         {isAdmin && (
-          <View className="mt-2.5 flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
-            <View
-              className={`h-10 w-10 items-center justify-center rounded-[10px] ${
-                cloudStatusQuery.data?.connected ? 'bg-green-weak dark:bg-green-weak-dark' : 'bg-red-weak dark:bg-red-weak-dark'
-              }`}
-            >
-              <Text className="text-[18px]">☁️</Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-[14px] font-semibold text-text dark:text-text-dark">Google Cloud Storage</Text>
-              <Text className="text-[11.5px] text-muted dark:text-muted-dark">Invoice PDF archival</Text>
-            </View>
-            <View
-              className={`rounded-[20px] px-2.5 py-0.5 ${
-                cloudStatusQuery.isLoading
-                  ? 'bg-border-2 dark:bg-border-2-dark'
-                  : cloudStatusQuery.data?.connected
-                    ? 'bg-green-weak dark:bg-green-weak-dark'
-                    : 'bg-red-weak dark:bg-red-weak-dark'
-              }`}
-            >
-              <Text
-                className={`text-[11px] font-bold ${
-                  cloudStatusQuery.isLoading
-                    ? 'text-muted dark:text-muted-dark'
-                    : cloudStatusQuery.data?.connected
-                      ? 'text-green dark:text-green-dark'
-                      : 'text-red dark:text-red-dark'
-                }`}
-              >
-                {cloudStatusQuery.isLoading
-                  ? 'Checking…'
-                  : cloudStatusQuery.data?.connected
-                    ? 'Connected'
-                    : cloudStatusQuery.data?.configured
-                      ? 'Unreachable'
-                      : 'Not configured'}
-              </Text>
-            </View>
-          </View>
+          <>
+            <StatusRow
+              icon="☁️"
+              label="Google Cloud Storage"
+              sub="Invoice PDF archival"
+              loading={cloudStatusQuery.isLoading}
+              connected={!!cloudStatusQuery.data?.connected}
+              notConfiguredLabel={cloudStatusQuery.data?.configured ? 'Unreachable' : 'Not configured'}
+            />
+            <StatusRow
+              icon="💬"
+              label="Slack"
+              sub="Stock alerts to channels"
+              loading={slackStatusQuery.isLoading}
+              connected={!!slackStatusQuery.data?.connected}
+              notConfiguredLabel="Not connected"
+            />
+          </>
         )}
 
         {!isAdmin && (

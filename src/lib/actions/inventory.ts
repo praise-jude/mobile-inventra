@@ -6,6 +6,7 @@
 import { logAudit } from '@/lib/actions/audit';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
+import { checkAndSendStockAlerts } from '@/lib/actions/slack';
 import { supabase } from '@/lib/supabase';
 import type { AdjustmentType, Category, Supplier } from '@/types/database';
 
@@ -128,6 +129,9 @@ export async function createAdjustment(input: CreateAdjustmentInput): Promise<vo
     created_by: profile.id,
   });
   if (error) throw error;
+
+  // Fire-and-forget — a Slack outage must never block the adjustment.
+  void checkAndSendStockAlerts(profile.org_id, [input.productId]);
 
   void logAudit({
     orgId: profile.org_id,

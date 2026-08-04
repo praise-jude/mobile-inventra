@@ -105,6 +105,10 @@ export type Product = {
   image_url: string | null;
   barcode: string | null;
   archived_at: string | null;
+  // Dedups Slack stock alerts (lib/actions/slack.ts) — the status this
+  // product was last alerted at, so a sale doesn't re-post the same
+  // low-stock alert on every subsequent sale of the same item.
+  last_alerted_status: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -239,6 +243,16 @@ export type NotificationSettings = {
   new_purchase_orders: boolean;
   weekly_digest: boolean;
   large_supply_threshold_amount: number | null;
+};
+
+// Connecting/disconnecting stays web-only (Settings -> Integrations); mobile
+// only reads status + config (see lib/actions/slack.ts).
+export type Integration = {
+  org_id: string;
+  provider: string;
+  status: string;
+  connected_at: string | null;
+  config: { webhook_url?: string } | null;
 };
 
 export type SupplyStatus = 'pending' | 'received' | 'verified' | 'cancelled';
@@ -756,7 +770,10 @@ export type Database = {
 
       products: TableDef<
         Product,
-        Omit<Product, 'id' | 'status' | 'created_at' | 'updated_at'> & { id?: string },
+        Omit<Product, 'id' | 'status' | 'created_at' | 'updated_at' | 'last_alerted_status'> & {
+          id?: string;
+          last_alerted_status?: string | null;
+        },
         Partial<Omit<Product, 'id' | 'org_id' | 'status' | 'created_at' | 'updated_at'>>
       >;
       categories: TableDef<Category, Omit<Category, 'id'> & { id?: string }, Partial<Omit<Category, 'id' | 'org_id'>>>;
@@ -843,6 +860,7 @@ export type Database = {
         never
       >;
       notification_settings: TableDef<NotificationSettings, never, Partial<Omit<NotificationSettings, 'org_id'>>>;
+      integrations: TableDef<Integration, never, never>;
       print_settings: TableDef<PrintSettings, never, Partial<Omit<PrintSettings, 'org_id'>>>;
       mfa_recovery_codes: TableDef<MfaRecoveryCode, never, never>;
       notifications: TableDef<

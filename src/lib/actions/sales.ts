@@ -8,6 +8,7 @@ import { canCreateSale, canEditSale, canVoidSale, UpgradeRequiredError } from '@
 import { logError } from '@/lib/logger';
 import { requirePermission } from '@/lib/permissions';
 import { requireProfile } from '@/lib/session';
+import { checkAndSendStockAlerts } from '@/lib/actions/slack';
 import { supabase } from '@/lib/supabase';
 import type { PaymentMethod, Profile, UserRole } from '@/types/database';
 
@@ -142,6 +143,9 @@ export async function performRecordSale(
     })),
   );
   if (movementError) throw new Error('Could not update stock for this sale.');
+
+  // Fire-and-forget — a Slack outage must never block recording the sale.
+  void checkAndSendStockAlerts(orgId, lines.map((l) => l.productId));
 
   void logAudit({
     orgId,
