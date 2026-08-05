@@ -344,16 +344,35 @@ export default function DashboardScreen() {
               {today} · 🕒 {liveTime}
             </Text>
           </View>
-          <Pressable
-            onPress={() => {
-              haptics.tap();
-              router.push('/notifications');
-            }}
-            hitSlop={10}
-            className="h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface dark:border-border-dark dark:bg-surface-dark"
-          >
-            <Text className="text-[15px]">🔔</Text>
-          </Pressable>
+          <View className="flex-row gap-2">
+            {isOwnerAdmin && cloudStatusQuery.data && (
+              <Pressable
+                onPress={() => {
+                  haptics.tap();
+                  router.push('/settings');
+                }}
+                hitSlop={10}
+                className="relative h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface dark:border-border-dark dark:bg-surface-dark"
+              >
+                <Text className="text-[15px]">☁️</Text>
+                <View
+                  className={`absolute right-[7px] top-[7px] h-[7px] w-[7px] rounded-full border-[1.5px] border-surface dark:border-surface-dark ${
+                    cloudStatusQuery.data.connected ? 'bg-green dark:bg-green-dark' : 'bg-red dark:bg-red-dark'
+                  }`}
+                />
+              </Pressable>
+            )}
+            <Pressable
+              onPress={() => {
+                haptics.tap();
+                router.push('/notifications');
+              }}
+              hitSlop={10}
+              className="h-9 w-9 items-center justify-center rounded-[9px] border border-border bg-surface dark:border-border-dark dark:bg-surface-dark"
+            >
+              <Text className="text-[15px]">🔔</Text>
+            </Pressable>
+          </View>
         </View>
 
         {topAlerts.length > 0 && (
@@ -708,38 +727,6 @@ export default function DashboardScreen() {
             </View>
           )}
         </View>
-
-        {cloudStatusQuery.data && (
-          <Pressable
-            onPress={() => router.push('/settings')}
-            className="mt-4 flex-row items-center gap-3 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark"
-          >
-            <View
-              className={`h-[38px] w-[38px] items-center justify-center rounded-[10px] ${
-                cloudStatusQuery.data.connected ? 'bg-green-weak dark:bg-green-weak-dark' : 'bg-red-weak dark:bg-red-weak-dark'
-              }`}
-            >
-              <Text className="text-[18px]">☁️</Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-[13.5px] font-bold text-text dark:text-text-dark">Google Cloud Storage</Text>
-              <Text className="text-[12px] text-text-2 dark:text-text-2-dark">Invoice PDF archival</Text>
-            </View>
-            <View
-              className={`rounded-[20px] px-2.5 py-0.5 ${
-                cloudStatusQuery.data.connected ? 'bg-green-weak dark:bg-green-weak-dark' : 'bg-red-weak dark:bg-red-weak-dark'
-              }`}
-            >
-              <Text
-                className={`text-[11px] font-bold ${
-                  cloudStatusQuery.data.connected ? 'text-green dark:text-green-dark' : 'text-red dark:text-red-dark'
-                }`}
-              >
-                {cloudStatusQuery.data.connected ? 'Connected' : cloudStatusQuery.data.configured ? 'Unreachable' : 'Not configured'}
-              </Text>
-            </View>
-          </Pressable>
-        )}
 
         {showAnalytics && activeTeamMembersQuery.data && (
           <View className="mt-4">
