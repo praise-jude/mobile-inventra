@@ -34,6 +34,21 @@ module.exports = {
     plugins: [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          android: {
+            // R8 shrinks + obfuscates the release build (smaller APK/AAB,
+            // readable crash stacks in Play Console once a mapping file is
+            // uploaded). Bundled consumer ProGuard rules from installed
+            // libraries cover most of this automatically; verify a real
+            // release build still works end-to-end before shipping past
+            // internal testing (a reflection-based path with no keep rule
+            // is the one thing static checks here can't catch).
+            enableMinifyInReleaseBuilds: true,
+          },
+        },
+      ],
+      [
         "expo-splash-screen",
         {
           backgroundColor: "#f8fafc",
