@@ -9,7 +9,13 @@ module.exports = {
     name: "Royal Inventra",
     slug: "royal-inventra",
     version: "1.0.0",
-    orientation: "portrait",
+    // Was "portrait" — Android 16 ignores this restriction on large-screen
+    // devices (tablets/foldables) regardless of what's declared here, so
+    // keeping it only sets up a forced, uncontrolled transition later. No
+    // screen in this app has been laid out or tested for landscape/wide
+    // viewports yet — this removes the OS-level lock, it does not mean
+    // tablet/landscape layouts have been verified to look right.
+    orientation: "default",
     icon: "./assets/images/icon.png",
     scheme: "royalinventra",
     userInterfaceStyle: "automatic",
@@ -45,9 +51,18 @@ module.exports = {
             // internal testing (a reflection-based path with no keep rule
             // is the one thing static checks here can't catch).
             enableMinifyInReleaseBuilds: true,
+            // Requires enableMinifyInReleaseBuilds (above) — strips unused
+            // resources (drawables/strings/etc.), not just unused code.
+            enableShrinkResourcesInReleaseBuilds: true,
           },
         },
       ],
+      // See plugins/withOptimizedProguard.js — swaps R8's base ruleset from
+      // proguard-android.txt (carries a `-dontoptimize` directive) to
+      // proguard-android-optimize.txt, since expo-build-properties has no
+      // option for this and Expo's generated build.gradle hardcodes the
+      // non-optimizing file.
+      require("./plugins/withOptimizedProguard"),
       [
         "expo-splash-screen",
         {
