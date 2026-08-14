@@ -13,12 +13,17 @@ interface UpgradeModalContextValue {
 const UpgradeModalContext = createContext<UpgradeModalContextValue | undefined>(undefined);
 
 // Mirrors Inventra/components/billing/EntitlementsProvider.tsx's modal —
-// mounted once near the root (src/app/_layout.tsx) so any screen can
-// trigger it via useUpgradeModal() without prop-drilling. Also owns the
-// Phase F8 realtime listener: another device upgrading (or a payment
-// lapsing) flips this org's subscriptions row, invalidating the
-// entitlements query here so Premium unlocks (or Free limits re-apply)
-// immediately everywhere in the app, not just on next navigation.
+// mounted once in src/app/(app)/_layout.tsx (every useUpgradeModal()
+// caller lives under (app)) so any screen there can trigger it without
+// prop-drilling. Deliberately NOT mounted at the true app root: it fires
+// its own entitlements RPC + opens a realtime subscription the instant a
+// session exists, which — mounted above the auth gate — was competing for
+// network/CPU during the cold-start window before the user had even
+// reached a screen that needs it. Also owns the Phase F8 realtime
+// listener: another device upgrading (or a payment lapsing) flips this
+// org's subscriptions row, invalidating the entitlements query here so
+// Premium unlocks (or Free limits re-apply) immediately everywhere in the
+// app, not just on next navigation.
 export function UpgradeModalProvider({ children }: PropsWithChildren) {
   const [open, setOpen] = useState(false);
   const entitlementsQuery = useEntitlements();

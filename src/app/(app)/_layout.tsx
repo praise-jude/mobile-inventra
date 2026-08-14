@@ -6,6 +6,7 @@ import { SupportWidget } from '@/components/support-widget';
 import { registerPushToken } from '@/lib/actions/notifications';
 import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { PresenceProvider } from '@/lib/presence-context';
+import { UpgradeModalProvider } from '@/lib/upgrade-modal-context';
 
 // A Stack, not NativeTabs, wrapping everything under (app) — (tabs)/ is
 // one screen in it (the 5 bottom-bar destinations), and every other
@@ -43,10 +44,12 @@ export default function AppLayout() {
 
   return (
     <PresenceProvider userId={profile.id} orgId={profile.org_id} name={`${profile.first_name} ${profile.last_name}`} role={profile.role}>
-      <View style={{ flex: 1 }}>
-        {stack}
-        <SupportWidget />
-      </View>
+      <UpgradeModalProvider>
+        <View style={{ flex: 1 }}>
+          {stack}
+          <SupportWidget />
+        </View>
+      </UpgradeModalProvider>
     </PresenceProvider>
   );
 }

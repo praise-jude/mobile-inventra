@@ -16,7 +16,6 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '@/lib/auth-context';
 import { IntroSeenProvider, useIntroSeen } from '@/lib/first-launch';
 import { ThemePreferenceProvider } from '@/lib/theme-preference-context';
-import { UpgradeModalProvider } from '@/lib/upgrade-modal-context';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,12 +43,10 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <IntroSeenProvider>
             <AuthProvider>
-              <UpgradeModalProvider>
-                <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-                  <AnimatedSplashOverlay />
-                  <RootNavigator />
-                </ThemeProvider>
-              </UpgradeModalProvider>
+              <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+                <AnimatedSplashOverlay />
+                <RootNavigator />
+              </ThemeProvider>
             </AuthProvider>
           </IntroSeenProvider>
         </QueryClientProvider>
