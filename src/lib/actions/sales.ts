@@ -122,26 +122,27 @@ export async function performRecordSale(
     throw new Error('Could not record the sale.');
   }
 
-  const { error: payError } = await supabase
-    .from('sale_payments')
-    .insert({ org_id: orgId, sale_id: sale.id, method: input.paymentMethod, amount: total });
+  // Neither depends on the other's result, both only need sale.id — was
+  // sequential (payment, then stock), now parallel.
+  const [{ error: payError }, { error: movementError }] = await Promise.all([
+    supabase.from('sale_payments').insert({ org_id: orgId, sale_id: sale.id, method: input.paymentMethod, amount: total }),
+    supabase.from('stock_movements').insert(
+      lines.map((l) => ({
+        org_id: orgId,
+        product_id: l.productId,
+        warehouse_id: l.warehouseId,
+        type: 'sale' as const,
+        qty_delta: -l.qty,
+        unit_price: l.unitPrice,
+        reason: null,
+        adjustment_type: null,
+        notes: null,
+        sale_id: sale.id,
+        created_by: userId,
+      })),
+    ),
+  ]);
   if (payError) throw new Error("Could not record the sale's payment.");
-
-  const { error: movementError } = await supabase.from('stock_movements').insert(
-    lines.map((l) => ({
-      org_id: orgId,
-      product_id: l.productId,
-      warehouse_id: l.warehouseId,
-      type: 'sale' as const,
-      qty_delta: -l.qty,
-      unit_price: l.unitPrice,
-      reason: null,
-      adjustment_type: null,
-      notes: null,
-      sale_id: sale.id,
-      created_by: userId,
-    })),
-  );
   if (movementError) throw new Error('Could not update stock for this sale.');
 
   // Fire-and-forget — a Slack outage must never block recording the sale.
