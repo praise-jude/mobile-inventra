@@ -25,6 +25,7 @@ import { useEntitlements } from '@/lib/hooks/use-entitlements';
 import { useLiveClock } from '@/lib/hooks/use-live-clock';
 import { useHasPermission } from '@/lib/hooks/use-permissions';
 import { useActiveTeamMembers } from '@/lib/hooks/use-team';
+import { useMyProfile } from '@/lib/hooks/use-my-profile';
 import { MOVEMENT_META } from '@/lib/movement-meta';
 import { isAdminRole } from '@/lib/roles';
 import { supabase } from '@/lib/supabase';
@@ -74,8 +75,17 @@ export default function DashboardScreen() {
   const cashRegisterQuery = useTodaysCashRegister(defaultWarehouseId);
   const outOfStockQuery = useOutOfStockPreview(6);
 
-  // Split into a fast "core" query (profile/org/top-line KPIs — everything
-  // every tier needs) and a slower "analytics" query (charts/breakdowns,
+  // profile comes from the already-cached useMyProfile() (the parent
+  // (app)/_layout.tsx already fetches and warms this before any tab screen
+  // mounts, via PresenceProvider/registerPushToken) instead of coreQuery
+  // re-fetching the identical `profiles.select('*')` row under a different
+  // query key — that was a fully redundant network round trip on every
+  // cold start. org is still its own fetch (not cached elsewhere), but at
+  // least no longer stacked behind a second profile fetch first.
+  const profileQuery = useMyProfile();
+
+  // Split into a fast "core" query (org/top-line KPIs — everything every
+  // tier needs) and a slower "analytics" query (charts/breakdowns,
   // Manager+Premium only) that only starts once core data AND entitlements
   // are both known. Previously this was one big query gated on
   // `!entitlementsQuery.isLoading`, so the ENTIRE dashboard — including the
@@ -85,14 +95,9 @@ export default function DashboardScreen() {
   // (src/app/_layout.tsx's RootNavigator). Decoupling core from
   // entitlements removes one full serial network phase from cold start.
   const coreQuery = useQuery({
-    queryKey: ['dashboard-core', session?.user.id],
+    queryKey: ['dashboard-core', profileQuery.data?.id],
     queryFn: async () => {
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session!.user.id)
-        .single();
-      if (profileError) throw profileError;
+      const profile = profileQuery.data!;
 
       const { data: org, error: orgError } = await supabase
         .from('organizations')
@@ -132,7 +137,7 @@ export default function DashboardScreen() {
         activity: (activityRes.data ?? []) as unknown as ActivityRow[],
       };
     },
-    enabled: !!session,
+    enabled: !!profileQuery.data,
   });
 
   // Free plan keeps the basic KPI cards (Today's Revenue etc. — role-gated
@@ -248,7 +253,14 @@ export default function DashboardScreen() {
     if (showAnalytics) void analyticsQuery.refetch();
   }
 
-  if (coreQuery.isLoading) {
+  // coreQuery is enabled: !!profileQuery.data, so while profileQuery is
+  // still loading, coreQuery sits disabled with no data and — in
+  // TanStack Query v5 — isLoading (isPending && isFetching) is actually
+  // FALSE for a disabled, never-fetched query, not true. Checking
+  // "!coreQuery.data && !coreQuery.isError" alongside isLoading catches
+  // that window too, instead of falling through to the error branch
+  // below on every normal cold start.
+  if (coreQuery.isLoading || profileQuery.isLoading || (!coreQuery.data && !coreQuery.isError)) {
     return (
       <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
         <View className="gap-3 px-5 pt-4">
@@ -266,7 +278,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (coreQuery.isError || !coreQuery.data) {
+  if (coreQuery.isError || profileQuery.isError) {
     return (
       <SafeAreaView className="flex-1 bg-bg dark:bg-bg-dark">
         <ErrorState onRetry={handleRefresh} />
